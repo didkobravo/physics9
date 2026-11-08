@@ -179,3 +179,11 @@ button.primary {
 .level-warn { stroke: var(--color-warn); fill: var(--color-warn); }
 .level-danger { stroke: var(--color-danger); fill: var(--color-danger); }
 .plumb.level-ok, .plumb.level-warn, .plumb.level-danger, .support { fill: none; }
+
+.control:has(input:disabled) {
+  opacity: 0.45;
+}
+
+input[type="range"]:disabled {
+  cursor: not-allowed;
+}

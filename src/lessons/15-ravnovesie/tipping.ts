@@ -6,6 +6,11 @@
  * vertical line through its centre of gravity C leaves the support base,
  * i.e. when tan θ > b / h for a uniform box of base b and height h.
  *
+ * Once it has tipped past the corner it lands on a face and is "fallen" until
+ * the user stands it up. If the face it lands on is still unstable it keeps
+ * tumbling down the ramp, and if its centre passes the end of the ramp it
+ * drops onto the ground. Every landing is treated as inelastic (it stops).
+ *
  * World coordinates are metres, y up. They are mapped to SVG viewBox units.
  */
 import { html, slider } from "../../lib/dom";
@@ -14,7 +19,7 @@ import { startLoop } from "../../lib/loop";
 import { pointsAttr, setAttrs, svgEl, type Pt } from "../../lib/svg";
 
 const G = 9.8;
-const VIEW_W = 560;
+const VIEW_W = 580;
 const VIEW_H = 420;
 const SCALE = 100; // viewBox units per metre
 const GROUND_Y = VIEW_H - 24; // SVG y of world y = 0
@@ -24,8 +29,16 @@ const RAMP_LEN = 3.3;
 const BOX_POS = 2.15; // distance of the box's base centre from the hinge, along the ramp
 
 const MAX_ANGLE = 70;
+const DROP_TIME = 0.45; // s, fall from the ramp end to the ground
 
-type Phase = "standing" | "tipping" | "fallen";
+/**
+ * standing — upright on its original base
+ * tipping  — rotating about its downhill corner (tumble = how many faces it has already rolled over)
+ * fallen   — lying on a face on the ramp
+ * dropping — falling off the end of the ramp
+ * ground   — lying on the ground
+ */
+type Phase = "standing" | "tipping" | "fallen" | "dropping" | "ground";
 type Level = "ok" | "warn" | "danger";
 
 const toSvg = (p: Pt): Pt => ({ x: p.x * SCALE, y: GROUND_Y - p.y * SCALE });
@@ -34,15 +47,27 @@ const rotCW = (v: Pt, a: number): Pt => ({
   x: v.x * Math.cos(a) + v.y * Math.sin(a),
   y: -v.x * Math.sin(a) + v.y * Math.cos(a),
 });
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export function mountTipping(host: HTMLElement): () => void {
   // ---- state ----
   let thetaDeg = 0;
-  let b = 0.6; // base width, m
-  let h = 1.2; // load height, m
+  let b = 0.6; // base width, m (box-fixed)
+  let h = 1.2; // load height, m (box-fixed)
   let phase: Phase = "standing";
-  let phi = 0; // extra rotation about the pivot, clockwise (rad)
+
+  // Pose on the ramp, in ramp terms. The face currently on the ramp spans
+  // [sP, sP + along] measured uphill from the hinge; `rise` is the box's
+  // extent away from the ramp. `quarter` counts completed 90° tumbles.
+  let sP = BOX_POS - b / 2;
+  let along = b;
+  let rise = h;
+  let quarter = 0;
+  let phi = 0; // rotation of the current tip, clockwise (rad)
   let omega = 0; // angular velocity (rad/s)
+
+  // Drop animation (world pose interpolated from start to end)
+  let drop = { t: 0, c0: { x: 0, y: 0 }, a0: 0, c1: { x: 0, y: 0 }, a1: 0 };
 
   // ---- DOM ----
   const root = html(`<div class="sim"></div>`);
@@ -53,7 +78,7 @@ export function mountTipping(host: HTMLElement): () => void {
   });
   svgEl("rect", { class: "ground", x: 0, y: GROUND_Y, width: VIEW_W, height: VIEW_H - GROUND_Y }, svg);
   const ramp = svgEl("polygon", { class: "ramp" }, svg);
-  const angleLabel = svgEl("text", { class: "scene-angle", "font-size": 20 }, svg);
+  const angleLabel = svgEl("text", { class: "scene-angle", "font-size": 20, x: 16, y: 34 }, svg);
   const support = svgEl("line", { class: "support" }, svg);
   const box = svgEl("polygon", { class: "box" }, svg);
   const slat1 = svgEl("line", { class: "box-slat" }, svg);
@@ -103,20 +128,19 @@ export function mountTipping(host: HTMLElement): () => void {
 
   const standUp = () => {
     phase = "standing";
+    sP = BOX_POS - b / 2;
+    along = b;
+    rise = h;
+    quarter = 0;
     phi = 0;
     omega = 0;
   };
 
-  // The box can stand on this ramp without tipping (tan θ ≤ b / h).
-  const stableAt = (deg: number) => Math.tan((deg * Math.PI) / 180) <= b / h;
+  /** Down = it has gone past its corner at least once and has not been stood up. */
+  const isDown = () => phase === "fallen" || phase === "dropping" || phase === "ground" || quarter > 0;
 
   const offs = [
-    angle.onInput((v) => {
-      thetaDeg = v;
-      // A fallen box is put back upright as soon as the ramp is lowered to an
-      // angle where it can stand, so the drawing and status match the sliders.
-      if (phase === "fallen" && stableAt(v)) standUp();
-    }),
+    angle.onInput((v) => (thetaDeg = v)),
     width.onInput((v) => {
       b = v;
       standUp();
@@ -133,32 +157,78 @@ export function mountTipping(host: HTMLElement): () => void {
   };
   reset.addEventListener("click", onReset);
 
-  // ---- geometry for the current state ----
-  function geometry() {
+  // ---- geometry ----
+  function rampAxes() {
     const th = (thetaDeg * Math.PI) / 180;
-    const up: Pt = { x: -Math.cos(th), y: Math.sin(th) }; // uphill along the ramp
-    const normal: Pt = { x: Math.sin(th), y: Math.cos(th) }; // away from the ramp surface
-    const baseCentre = add(HINGE, up, BOX_POS);
-    const pivot = add(baseCentre, up, -b / 2); // downhill bottom corner
-    // Box axes after tipping by phi (clockwise about the pivot)
-    const ax = rotCW(up, phi);
-    const ay = rotCW(normal, phi);
-    const local = (p: number, q: number) => add(add(pivot, ax, p), ay, q);
-    const corners = [local(0, 0), local(b, 0), local(b, h), local(0, h)];
-    const c = local(b / 2, h / 2);
-    // Where the vertical through C meets the ramp line, measured from the hinge
-    const sFoot = (HINGE.x - c.x) / Math.cos(th);
-    const footPt = add(HINGE, up, sFoot);
-    return { th, up, pivot, corners, c, local, sFoot, footPt };
+    const u: Pt = { x: -Math.cos(th), y: Math.sin(th) }; // uphill along the ramp
+    const n: Pt = { x: Math.sin(th), y: Math.cos(th) }; // away from the ramp surface
+    return { th, u, n };
+  }
+
+  /** World pose of the box: centre C, box-fixed axes e1 (along b) and e2 (along h). */
+  type Pose = { c: Pt; e1: Pt; e2: Pt; pivot: Pt | null };
+
+  function rampPose(): Pose {
+    const { u, n } = rampAxes();
+    const pivot = add(HINGE, u, sP);
+    const r0 = add({ x: u.x * (along / 2), y: u.y * (along / 2) }, n, rise / 2);
+    const c = add(pivot, rotCW(r0, phi));
+    const a = quarter * (Math.PI / 2) + phi;
+    return { c, e1: rotCW(u, a), e2: rotCW(n, a), pivot };
+  }
+
+  function dropPose(): Pose {
+    const s = Math.min(drop.t / DROP_TIME, 1);
+    const k = s * s; // accelerating, like a fall
+    const c = { x: lerp(drop.c0.x, drop.c1.x, k), y: lerp(drop.c0.y, drop.c1.y, k) };
+    const a = lerp(drop.a0, drop.a1, k);
+    const e1 = { x: Math.cos(a), y: Math.sin(a) };
+    return { c, e1, e2: { x: e1.y, y: -e1.x }, pivot: null }; // e2 is e1 turned 90° clockwise, as on the ramp
+  }
+
+  const pose = (): Pose => (phase === "dropping" || phase === "ground" ? dropPose() : rampPose());
+
+  /** The box has just rolled onto its next face: decide what happens next. */
+  function land() {
+    quarter += 1;
+    sP -= rise;
+    [along, rise] = [rise, along];
+    phi = 0;
+    omega = 0;
+    const p = rampPose();
+    if (sP >= 0) {
+      // Whole face is on the ramp: tip again if C is past the new downhill corner
+      phase = p.c.x > p.pivot!.x ? "tipping" : "fallen";
+    } else if (p.c.x <= HINGE.x) {
+      phase = "fallen"; // overhangs the end, but C is still above the ramp
+    } else {
+      startDrop(p);
+    }
+  }
+
+  function startDrop(p: Pose) {
+    const a0 = Math.atan2(p.e1.y, p.e1.x);
+    // Keep turning clockwise to the nearest flat orientation
+    const a1 = Math.floor(a0 / (Math.PI / 2) - 1e-6) * (Math.PI / 2);
+    const flatB = Math.round(a1 / (Math.PI / 2)) % 2 === 0; // b lies horizontally
+    const w = flatB ? b : h;
+    const ht = flatB ? h : b;
+    drop = { t: 0, c0: p.c, a0, c1: { x: HINGE.x + 0.03 + w / 2, y: ht / 2 }, a1 };
+    phase = "dropping";
   }
 
   // ---- physics step ----
   function step(dt: number) {
-    if (phase === "fallen") return;
+    if (phase === "fallen" || phase === "ground") return;
+    if (phase === "dropping") {
+      drop.t += dt;
+      if (drop.t >= DROP_TIME) phase = "ground";
+      return;
+    }
     const sub = 4;
     for (let i = 0; i < sub; i++) {
-      const g = geometry();
-      const lever = g.c.x - g.pivot.x; // >0: C is downhill of the pivot → tips
+      const p = rampPose();
+      const lever = p.c.x - p.pivot!.x; // >0: C is downhill of the pivot → tips
       if (phase === "standing") {
         if (lever <= 0) return;
         phase = "tipping";
@@ -167,51 +237,73 @@ export function mountTipping(host: HTMLElement): () => void {
       omega += alpha * (dt / sub);
       phi += omega * (dt / sub);
       if (phi <= 0) {
-        // the ramp was lowered mid-tip: the box settles back on its base
-        standUp();
+        // The ramp was lowered mid-tip: it settles back onto the face it came from.
+        if (quarter === 0) standUp();
+        else {
+          phi = 0;
+          omega = 0;
+          phase = "fallen";
+        }
         return;
       }
       if (phi >= Math.PI / 2) {
-        phi = Math.PI / 2;
-        omega = 0;
-        phase = "fallen";
+        land();
         return;
       }
     }
   }
 
   // ---- render ----
+  let lastDown: boolean | null = null;
+
   function render() {
-    const g = geometry();
-    const top = add(HINGE, g.up, RAMP_LEN);
+    const { th, u } = rampAxes();
+    const top = add(HINGE, u, RAMP_LEN);
     const rampPts = [{ x: HINGE.x, y: 0 }, HINGE, top, { x: top.x, y: 0 }].map(toSvg);
     setAttrs(ramp, { points: pointsAttr(rampPts) });
-
-    // Fixed top-left corner: the box and its labels never reach it.
-    setAttrs(angleLabel, { x: 16, y: 34 });
     angleLabel.textContent = `наклон ${num(thetaDeg)}°`;
 
-    // Box and decorative slats
-    setAttrs(box, { points: pointsAttr(g.corners.map(toSvg)) });
-    const s1a = toSvg(g.local(0, h / 3));
-    const s1b = toSvg(g.local(b, h / 3));
-    const s2a = toSvg(g.local(0, (2 * h) / 3));
-    const s2b = toSvg(g.local(b, (2 * h) / 3));
-    setAttrs(slat1, { x1: s1a.x, y1: s1a.y, x2: s1b.x, y2: s1b.y });
-    setAttrs(slat2, { x1: s2a.x, y1: s2a.y, x2: s2b.x, y2: s2b.y });
+    const p = pose();
+    const corner = (i: number, j: number) => add(add(p.c, p.e1, (i * b) / 2), p.e2, (j * h) / 2);
+    setAttrs(box, { points: pointsAttr([corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)].map(toSvg)) });
+    const slat = (el: SVGLineElement, j: number) => {
+      const a = toSvg(corner(-1, j));
+      const z = toSvg(corner(1, j));
+      setAttrs(el, { x1: a.x, y1: a.y, x2: z.x, y2: z.y });
+    };
+    slat(slat1, -1 / 3);
+    slat(slat2, 1 / 3);
 
-    // How far inside the support base the plumb line lands (1 = centre, 0 = edge)
-    const edge = BOX_POS - b / 2;
-    const margin = phase === "standing" ? (g.sFoot - edge) / (b / 2) : -1;
-    const level: Level = margin < 0.05 ? "danger" : margin < 0.3 ? "warn" : "ok";
+    // Where the vertical through C lands: on the ramp, or on the ground past its end
+    const onRamp = p.c.x <= HINGE.x;
+    const footPt: Pt = onRamp ? add(HINGE, u, (HINGE.x - p.c.x) / Math.cos(th)) : { x: p.c.x, y: 0 };
 
-    // Support area: the whole base while standing, only the corner while tipping
-    const sa = toSvg(g.pivot);
-    const sb = phase === "standing" ? toSvg(add(g.pivot, g.up, b)) : sa;
+    // Colour: how far inside the support base the plumb line lands (1 = centre, 0 = edge)
+    let level: Level = "ok";
+    let sa: Pt;
+    let sb: Pt;
+    if (phase === "standing") {
+      const sFoot = (HINGE.x - p.c.x) / Math.cos(th);
+      const margin = (sFoot - sP) / (along / 2);
+      level = margin < 0.05 ? "danger" : margin < 0.3 ? "warn" : "ok";
+      sa = toSvg(add(HINGE, u, sP));
+      sb = toSvg(add(HINGE, u, sP + along));
+    } else if (phase === "tipping") {
+      level = "danger";
+      sa = sb = toSvg(p.pivot!);
+    } else if (phase === "fallen") {
+      sa = toSvg(add(HINGE, u, Math.max(sP, 0)));
+      sb = toSvg(add(HINGE, u, sP + along));
+    } else {
+      // dropping / ground: the face lying on the ground
+      const half = Math.abs(p.e1.x) > 0.5 ? b / 2 : h / 2;
+      sa = toSvg({ x: p.c.x - half, y: 0 });
+      sb = phase === "ground" ? toSvg({ x: p.c.x + half, y: 0 }) : sa;
+    }
     setAttrs(support, { x1: sa.x, y1: sa.y, x2: sb.x, y2: sb.y, class: `support level-${level}` });
 
-    const cs = toSvg(g.c);
-    const fs = toSvg(g.footPt);
+    const cs = toSvg(p.c);
+    const fs = toSvg(footPt);
     setAttrs(plumb, { x1: cs.x, y1: cs.y, x2: cs.x, y2: fs.y, class: `plumb level-${level}` });
     setAttrs(foot, { cx: cs.x, cy: fs.y, class: `level-${level}` });
 
@@ -221,24 +313,34 @@ export function mountTipping(host: HTMLElement): () => void {
     setAttrs(force, { x1: cs.x, y1: cs.y, x2: cs.x, y2: tip - 10 });
     setAttrs(forceHead, { points: `${cs.x - 8},${tip - 14} ${cs.x + 8},${tip - 14} ${cs.x},${tip + 2}` });
     setAttrs(forceLabel, { x: cs.x + 10, y: tip });
-
     setAttrs(cg, { cx: cs.x, cy: cs.y });
     setAttrs(cLabel, { x: cs.x - 26, y: cs.y - 8 });
 
+    // Base and load sliders are locked while the box is down, so they can't contradict the picture
+    const down = isDown();
+    if (down !== lastDown) {
+      width.input.disabled = down;
+      height.input.disabled = down;
+      lastDown = down;
+    }
+
     // Status line
-    const crit = num((Math.atan(b / h) * 180) / Math.PI);
     let text: string;
-    if (phase === "fallen") {
-      text = `Падна! Тази кутия се преобръща при наклон около ${crit}°. Натисни „Изправи кутията“.`;
+    let statusLevel: Level;
+    if (down && phase !== "tipping") {
+      text = "Лежи на страната си. Натисни „Изправи кутията“.";
+      statusLevel = "warn";
     } else if (phase === "tipping") {
       text = "Преобръща се! Отвесът от C излезе извън опората.";
+      statusLevel = "danger";
     } else if (level === "ok") {
       text = "Стои. Отвесът от C пада вътре в опората.";
+      statusLevel = "ok";
     } else {
       text = "Внимание! Отвесът е съвсем близо до ръба на опората.";
+      statusLevel = level;
     }
     if (status.textContent !== text) status.textContent = text;
-    const statusLevel = phase === "standing" ? level : "danger";
     status.dataset.level = statusLevel;
   }
 
