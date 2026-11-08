@@ -107,8 +107,16 @@ export function mountTipping(host: HTMLElement): () => void {
     omega = 0;
   };
 
+  // The box can stand on this ramp without tipping (tan θ ≤ b / h).
+  const stableAt = (deg: number) => Math.tan((deg * Math.PI) / 180) <= b / h;
+
   const offs = [
-    angle.onInput((v) => (thetaDeg = v)),
+    angle.onInput((v) => {
+      thetaDeg = v;
+      // A fallen box is put back upright as soon as the ramp is lowered to an
+      // angle where it can stand, so the drawing and status match the sliders.
+      if (phase === "fallen" && stableAt(v)) standUp();
+    }),
     width.onInput((v) => {
       b = v;
       standUp();
@@ -179,9 +187,9 @@ export function mountTipping(host: HTMLElement): () => void {
     const rampPts = [{ x: HINGE.x, y: 0 }, HINGE, top, { x: top.x, y: 0 }].map(toSvg);
     setAttrs(ramp, { points: pointsAttr(rampPts) });
 
-    const hs = toSvg(HINGE);
-    setAttrs(angleLabel, { x: hs.x - 120, y: hs.y - 12 });
-    angleLabel.textContent = `${num(thetaDeg)}°`;
+    // Fixed top-left corner: the box and its labels never reach it.
+    setAttrs(angleLabel, { x: 16, y: 34 });
+    angleLabel.textContent = `наклон ${num(thetaDeg)}°`;
 
     // Box and decorative slats
     setAttrs(box, { points: pointsAttr(g.corners.map(toSvg)) });
