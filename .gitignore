@@ -1,0 +1,7 @@
+# Private reference material (textbook scans) — never commit
+reference/
+
+node_modules/
+dist/
+.DS_Store
+*.log

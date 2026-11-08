@@ -1,0 +1,41 @@
+/* Project tokens, built only from Open Props values. */
+:root {
+  --content-width: var(--size-content-3);
+
+  --color-accent: var(--indigo-7);
+  --color-ok: var(--green-7);
+  --color-warn: var(--orange-7);
+  --color-danger: var(--red-7);
+  --color-force: var(--red-7);
+
+  --color-ramp: var(--brown-5);
+  --color-ramp-edge: var(--brown-8);
+  --color-box: var(--orange-4);
+  --color-box-edge: var(--orange-9);
+  --color-ground: var(--stone-4);
+  --color-plumb: var(--gray-8);
+
+  --note-bg: var(--yellow-1);
+  --note-edge: var(--yellow-6);
+
+  --touch-target: var(--size-8);
+  --thumb-size: var(--size-7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-accent: var(--indigo-3);
+    --color-ok: var(--green-4);
+    --color-warn: var(--orange-4);
+    --color-danger: var(--red-5);
+    --color-force: var(--red-5);
+    --color-ramp: var(--brown-7);
+    --color-ramp-edge: var(--brown-4);
+    --color-box: var(--orange-6);
+    --color-box-edge: var(--orange-2);
+    --color-ground: var(--stone-8);
+    --color-plumb: var(--gray-2);
+    --note-bg: var(--yellow-12);
+    --note-edge: var(--yellow-7);
+  }
+}

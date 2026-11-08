@@ -1,0 +1,181 @@
+@import "open-props/style";
+@import "open-props/normalize";
+
+body {
+  font-family: var(--font-sans);
+}
+
+#app {
+  max-inline-size: var(--content-width);
+  margin-inline: auto;
+  padding: var(--size-3);
+  display: grid;
+  gap: var(--size-4);
+}
+
+h1 {
+  font-size: var(--font-size-6);
+  line-height: var(--font-lineheight-1);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+}
+
+/* Highlighted rule / assumption boxes */
+.note,
+.key-idea {
+  padding: var(--size-3);
+  border-radius: var(--radius-2);
+  border-inline-start: var(--border-size-4) solid var(--note-edge);
+  background: var(--note-bg);
+}
+
+.key-idea {
+  border-color: var(--color-accent);
+  background: var(--surface-2);
+}
+
+/* Lesson index */
+.lesson-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--size-3);
+}
+
+.lesson-list li {
+  padding: 0;
+  max-inline-size: none;
+}
+
+.lesson-card {
+  display: grid;
+  gap: var(--size-1);
+  padding: var(--size-3);
+  border-radius: var(--radius-3);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  text-decoration: none;
+  color: var(--text-1);
+}
+
+.lesson-card[aria-disabled="true"] {
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.lesson-card .num {
+  font-size: var(--font-size-0);
+  color: var(--text-2);
+}
+
+/* Simulation */
+.sim {
+  display: grid;
+  gap: var(--size-3);
+}
+
+.sim svg {
+  inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius-3);
+  background: var(--surface-2);
+  touch-action: none;
+}
+
+.sim-status {
+  min-block-size: calc(2 * var(--font-lineheight-3) * 1em);
+  font-weight: var(--font-weight-6);
+  color: var(--color-ok);
+}
+
+.sim-status[data-level="warn"] { color: var(--color-warn); }
+.sim-status[data-level="danger"] { color: var(--color-danger); }
+
+.controls {
+  display: grid;
+  gap: var(--size-3);
+}
+
+.control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--size-1) var(--size-2);
+}
+
+.control output {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-6);
+}
+
+.control input[type="range"] {
+  grid-column: 1 / -1;
+}
+
+/* Big, touch-friendly range sliders */
+input[type="range"] {
+  appearance: none;
+  inline-size: 100%;
+  block-size: var(--touch-target);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  block-size: var(--size-2);
+  border-radius: var(--radius-round);
+  background: var(--surface-4);
+}
+
+input[type="range"]::-moz-range-track {
+  block-size: var(--size-2);
+  border-radius: var(--radius-round);
+  background: var(--surface-4);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: var(--thumb-size);
+  block-size: var(--thumb-size);
+  margin-block-start: calc((var(--size-2) - var(--thumb-size)) / 2);
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  border: var(--border-size-2) solid var(--surface-1);
+  box-shadow: var(--shadow-2);
+}
+
+input[type="range"]::-moz-range-thumb {
+  inline-size: var(--thumb-size);
+  block-size: var(--thumb-size);
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  border: var(--border-size-2) solid var(--surface-1);
+  box-shadow: var(--shadow-2);
+}
+
+button.primary {
+  min-block-size: var(--touch-target);
+  justify-self: start;
+}
+
+/* SVG scene classes (geometry in viewBox units, colors from tokens) */
+.ground { fill: var(--color-ground); }
+.ramp { fill: var(--color-ramp); stroke: var(--color-ramp-edge); stroke-width: 2; }
+.box { fill: var(--color-box); stroke: var(--color-box-edge); stroke-width: 3; stroke-linejoin: round; }
+.box-slat { stroke: var(--color-box-edge); stroke-width: 1.5; opacity: 0.5; }
+.support { stroke-width: 7; stroke-linecap: round; }
+.plumb { stroke-width: 2.5; stroke-dasharray: 8 6; }
+.cg { fill: var(--color-plumb); stroke: var(--surface-2); stroke-width: 2; }
+.force { stroke: var(--color-force); stroke-width: 4; }
+.force-head { fill: var(--color-force); }
+.scene-label { fill: var(--text-1); font-style: italic; font-family: var(--font-serif); }
+.scene-angle { fill: var(--text-2); font-family: var(--font-sans); }
+
+.level-ok { stroke: var(--color-ok); fill: var(--color-ok); }
+.level-warn { stroke: var(--color-warn); fill: var(--color-warn); }
+.level-danger { stroke: var(--color-danger); fill: var(--color-danger); }
+.plumb.level-ok, .plumb.level-warn, .plumb.level-danger, .support { fill: none; }
