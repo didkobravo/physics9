@@ -16,13 +16,14 @@
 import { html, slider } from "../../lib/dom";
 import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
+import { createArrow, createScene } from "../../lib/scene";
+import { createStatus, type Level } from "../../lib/status";
 import { pointsAttr, setAttrs, svgEl, type Pt } from "../../lib/svg";
 
 const G = 9.8;
 const VIEW_W = 580;
 const VIEW_H = 420;
 const SCALE = 100; // viewBox units per metre
-const GROUND_Y = VIEW_H - 24; // SVG y of world y = 0
 
 const HINGE: Pt = { x: 3.6, y: 0.25 }; // downhill end of the ramp (world)
 const RAMP_LEN = 3.3;
@@ -39,9 +40,7 @@ const DROP_TIME = 0.45; // s, fall from the ramp end to the ground
  * ground   — lying on the ground
  */
 type Phase = "standing" | "tipping" | "fallen" | "dropping" | "ground";
-type Level = "ok" | "warn" | "danger";
 
-const toSvg = (p: Pt): Pt => ({ x: p.x * SCALE, y: GROUND_Y - p.y * SCALE });
 const add = (a: Pt, b: Pt, k = 1): Pt => ({ x: a.x + b.x * k, y: a.y + b.y * k });
 const rotCW = (v: Pt, a: number): Pt => ({
   x: v.x * Math.cos(a) + v.y * Math.sin(a),
@@ -71,12 +70,12 @@ export function mountTipping(host: HTMLElement): () => void {
 
   // ---- DOM ----
   const root = html(`<div class="sim"></div>`);
-  const svg = svgEl("svg", {
-    viewBox: `0 0 ${VIEW_W} ${VIEW_H}`,
-    role: "img",
-    "aria-label": "Кутия върху наклонена рампа с отвес от центъра на тежестта",
+  const { svg, toSvg } = createScene({
+    width: VIEW_W,
+    height: VIEW_H,
+    scale: SCALE,
+    label: "Кутия върху наклонена рампа с отвес от центъра на тежестта",
   });
-  svgEl("rect", { class: "ground", x: 0, y: GROUND_Y, width: VIEW_W, height: VIEW_H - GROUND_Y }, svg);
   const ramp = svgEl("polygon", { class: "ramp" }, svg);
   const angleLabel = svgEl("text", { class: "scene-angle", "font-size": 20, x: 16, y: 34 }, svg);
   const support = svgEl("line", { class: "support" }, svg);
@@ -85,15 +84,14 @@ export function mountTipping(host: HTMLElement): () => void {
   const slat2 = svgEl("line", { class: "box-slat" }, svg);
   const plumb = svgEl("line", { class: "plumb" }, svg);
   const foot = svgEl("circle", { r: 6 }, svg);
-  const force = svgEl("line", { class: "force" }, svg);
-  const forceHead = svgEl("polygon", { class: "force-head" }, svg);
+  const gravity = createArrow(svg);
   const forceLabel = svgEl("text", { class: "scene-label", "font-size": 22 }, svg);
   const cg = svgEl("circle", { class: "cg", r: 7 }, svg);
   const cLabel = svgEl("text", { class: "scene-label", "font-size": 22 }, svg);
   cLabel.textContent = "C";
   forceLabel.textContent = "G";
 
-  const status = html(`<p class="sim-status" aria-live="polite"></p>`);
+  const status = createStatus();
 
   const angle = slider({
     label: "Наклон на рампата",
@@ -123,7 +121,7 @@ export function mountTipping(host: HTMLElement): () => void {
 
   const controls = html(`<div class="controls"></div>`);
   controls.append(angle.root, width.root, height.root, reset);
-  root.append(svg, status, controls);
+  root.append(svg, status.el, controls);
   host.append(root);
 
   const standUp = () => {
@@ -310,8 +308,7 @@ export function mountTipping(host: HTMLElement): () => void {
     // Gravity arrow G from C
     const len = 0.45 * SCALE;
     const tip = cs.y + len;
-    setAttrs(force, { x1: cs.x, y1: cs.y, x2: cs.x, y2: tip - 10 });
-    setAttrs(forceHead, { points: `${cs.x - 8},${tip - 14} ${cs.x + 8},${tip - 14} ${cs.x},${tip + 2}` });
+    gravity.set(cs, { x: cs.x, y: tip + 2 });
     setAttrs(forceLabel, { x: cs.x + 10, y: tip });
     setAttrs(cg, { cx: cs.x, cy: cs.y });
     setAttrs(cLabel, { x: cs.x - 26, y: cs.y - 8 });
@@ -340,8 +337,7 @@ export function mountTipping(host: HTMLElement): () => void {
       text = "Внимание! Отвесът е съвсем близо до ръба на опората.";
       statusLevel = level;
     }
-    if (status.textContent !== text) status.textContent = text;
-    status.dataset.level = statusLevel;
+    status.set(text, statusLevel);
   }
 
   const stop = startLoop((dt) => {

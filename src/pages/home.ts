@@ -11,10 +11,11 @@ export const home: Mount = (el) => {
           <b>Равновесие на телата</b>
           <span>Кога една кутия на рампа се преобръща?</span>
         </a></li>
-        <li><span class="lesson-card" aria-disabled="true">
-          <span class="num">Урок 16 · скоро</span>
+        <li><a class="lesson-card" href="#/rabota">
+          <span class="num">Урок 16</span>
           <b>Работа и мощност</b>
-        </span></li>
+          <span>Кога една сила върши работа — и кога не?</span>
+        </a></li>
         <li><span class="lesson-card" aria-disabled="true">
           <span class="num">Урок 17 · скоро</span>
           <b>Кинетична и потенциална енергия</b>

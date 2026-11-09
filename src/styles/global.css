@@ -187,3 +187,74 @@ button.primary {
 input[type="range"]:disabled {
   cursor: not-allowed;
 }
+
+.sim-status[data-level="neutral"] { color: var(--text-2); }
+
+/* Segmented button group (e.g. force direction) */
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--size-2);
+}
+
+.seg button,
+.btn-row button {
+  min-block-size: var(--touch-target);
+  padding-inline: var(--size-2);
+}
+
+.seg button[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--surface-1);
+  font-weight: var(--font-weight-7);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.readout {
+  display: grid;
+  gap: var(--size-1);
+  padding: var(--size-2) var(--size-3);
+  border-radius: var(--radius-2);
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.formulas {
+  display: grid;
+  gap: var(--size-1);
+}
+
+.later {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+/* Lesson 16 scene */
+.ruler { stroke: var(--text-2); stroke-width: 2; }
+.ruler-label, .meter-label { fill: var(--text-2); font-family: var(--font-sans); }
+.scene-small { fill: var(--text-1); font-family: var(--font-sans); }
+.s-bar { stroke: var(--color-accent); stroke-width: 6; stroke-linecap: round; }
+.rope { stroke: var(--text-2); stroke-width: 2.5; stroke-dasharray: 6 4; }
+.motor { fill: var(--gray-6); stroke: var(--gray-8); stroke-width: 2; }
+.motor-drum { fill: var(--gray-3); stroke: var(--gray-8); stroke-width: 2; }
+.wall { fill: var(--stone-6); stroke: var(--stone-9); stroke-width: 2; }
+.force-huge { stroke-width: 12; }
+.meter-frame { fill: var(--surface-1); stroke: var(--text-2); stroke-width: 2; }
+.meter-tick { stroke: var(--text-2); stroke-width: 1.5; }
+.meter-zero { stroke: var(--text-1); stroke-width: 4; }
+.meter-zero-label { fill: var(--text-1); font-weight: var(--font-weight-7); font-family: var(--font-sans); }
+.meter-bar-pos { fill: var(--color-ok); }
+.meter-bar-neg { fill: var(--color-danger); }
+.meter-value { fill: var(--text-1); font-weight: var(--font-weight-7); font-family: var(--font-sans); }
+.meter-value.pos { fill: var(--color-ok); }
+.meter-value.neg { fill: var(--color-danger); }
