@@ -191,7 +191,7 @@ button.primary {
   padding-inline: var(--size-5);
   border: none;
   border-radius: var(--radius-round);
-  background: var(--color-accent);
+  background: var(--primary-bg, var(--color-accent));
   color: var(--surface-1);
   font-size: var(--font-size-3);
   font-weight: var(--font-weight-7);
@@ -314,47 +314,11 @@ button:disabled {
 .bar-ep { fill: var(--color-energy-p); }
 .bar-ek { fill: var(--color-energy-k); }
 .total-line { stroke: var(--text-1); stroke-width: 2; stroke-dasharray: 6 4; }
-.h-bracket { stroke: var(--text-2); stroke-width: 2; }
+.h-bracket { stroke: var(--color-energy-p); stroke-width: 2.5; }
 .v-arrow.force { stroke: var(--color-energy-k); }
 .v-arrow.force-head { fill: var(--color-energy-k); }
-.stage-formula .ep { fill: var(--color-energy-p); }
-.stage-formula .ek { fill: var(--color-energy-k); }
-
-/* Predict-then-reveal */
-.predict {
-  display: grid;
-  gap: var(--size-2);
-  padding: var(--size-3);
-  border-radius: var(--radius-3);
-  background: var(--surface-2);
-}
-
-.predict .seg {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.predict-feedback[data-level="ok"] { color: var(--color-ok); font-weight: var(--font-weight-6); }
-.predict-feedback[data-level="warn"] { color: var(--color-warn); font-weight: var(--font-weight-6); }
-
-.predict svg {
-  inline-size: 100%;
-  block-size: auto;
-}
-
-.predict-formula {
-  font-variant-numeric: tabular-nums;
-}
-
-.predict-formula.hit {
-  color: var(--color-ok);
-  font-weight: var(--font-weight-6);
-}
-
-.marker { stroke: var(--text-1); stroke-width: 2; }
-.marker.dashed { stroke-dasharray: 5 4; stroke: var(--text-2); }
-.marker-label { fill: var(--text-1); font-family: var(--font-sans); }
-.marker-label.dim { fill: var(--text-2); }
-.track { fill: var(--surface-1); stroke: var(--text-2); stroke-width: 2; }
+.stage-formula .ep { fill: var(--color-energy-p-text); }
+.stage-formula .ek { fill: var(--color-energy-k-text); }
 
 /* Lesson 17 tabs and the lift / push scenes */
 .notes {
@@ -368,7 +332,186 @@ button:disabled {
 
 .cart { fill: var(--color-ball); stroke: var(--color-ball-edge); stroke-width: 2.5; }
 .wheel { fill: var(--gray-7); stroke: var(--gray-9); stroke-width: 2; }
-.push-zone { fill: var(--color-ok); opacity: 0.6; }
+.push-zone { fill: var(--color-work); opacity: 0.7; }
 .target-line { stroke: var(--text-2); stroke-width: 2; stroke-dasharray: 6 4; }
-.stage-formula .work { fill: var(--color-ok); }
-.stage-formula.ep-done .rule { fill: var(--color-energy-p); }
+.stage-formula .work { fill: var(--text-1); }
+
+/* Formula typography (all stage formulas): the formula bold, the
+   substituted numbers thin and faded, the result at full strength in the
+   line's colour. */
+.stage-formula .f-rule { font-weight: var(--font-weight-7); }
+.stage-formula .f-sub { font-weight: var(--font-weight-3); fill: var(--text-2); }
+.stage-formula .f-res { font-weight: var(--font-weight-6); }
+/* Lesson 16: the result carries the sign of the work */
+.stage-formula.pos .signed .f-res { fill: var(--color-ok); }
+.stage-formula.neg .signed .f-res { fill: var(--color-danger); }
+
+/* Formulas and subscripts use the standard Cyrillic letterforms (п, not the
+   Bulgarian localized form that looks like an n). Body text keeps lang="bg". */
+sub,
+.std,
+.stage-formula {
+  font-feature-settings: "locl" 0;
+}
+
+/* Energy colours: Ek orange, Eп blue, work neutral until it becomes one */
+.bar-work { fill: var(--color-work); }
+.lab-k { fill: var(--color-energy-k-text); }
+.lab-p { fill: var(--color-energy-p-text); }
+.ball.lifted { stroke: var(--color-energy-p); stroke-width: 4; }
+.ball.moving,
+.cart.moving { stroke: var(--color-energy-k); stroke-width: 4; }
+.sim-status[data-level="k"] { color: var(--color-energy-k-text); }
+.sim-status[data-level="p"] { color: var(--color-energy-p-text); }
+
+.lesson[data-energy="k"] { --primary-bg: var(--color-energy-k-text); }
+.lesson[data-energy="p"] { --primary-bg: var(--color-energy-p-text); }
+.lesson[data-energy="both"] {
+  --primary-bg: linear-gradient(90deg, var(--color-energy-k-text), var(--color-energy-p-text));
+}
+
+.tabs [data-tab="k"] { color: var(--color-energy-k-text); }
+.tabs [data-tab="p"] { color: var(--color-energy-p-text); }
+.tabs button[aria-selected="true"] { background: var(--surface-1); }
+.tabs [data-tab="k"][aria-selected="true"] { border-color: var(--color-energy-k-text); color: var(--color-energy-k-text); }
+.tabs [data-tab="p"][aria-selected="true"] { border-color: var(--color-energy-p-text); color: var(--color-energy-p-text); }
+.tabs [data-tab="both"][aria-selected="true"] {
+  color: var(--text-1);
+  border-color: transparent;
+  background:
+    linear-gradient(var(--surface-1), var(--surface-1)) padding-box,
+    linear-gradient(90deg, var(--color-energy-k-text), var(--color-energy-p-text)) border-box;
+}
+
+/* "Провери" strip above the stage */
+.check[hidden] { display: none; }
+.check {
+  display: grid;
+  gap: var(--size-2);
+  padding: var(--size-2) var(--size-3);
+  border-radius: var(--radius-2);
+  border-inline-start: var(--border-size-4) solid var(--color-accent);
+  background: var(--surface-2);
+}
+.check[data-energy="k"] { border-color: var(--color-energy-k); }
+.check[data-energy="p"] { border-color: var(--color-energy-p); }
+.check[data-energy="both"] { border-image: linear-gradient(var(--color-energy-k), var(--color-energy-p)) 1; }
+.check-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.check-close {
+  min-inline-size: var(--size-8);
+  min-block-size: var(--size-8);
+}
+.check-trials {
+  display: grid;
+  gap: var(--size-2);
+}
+.check-trial {
+  display: grid;
+  gap: var(--size-1);
+}
+.check-trial button {
+  min-block-size: var(--touch-target);
+  justify-self: start;
+  padding-inline: var(--size-3);
+}
+.check-trial button[aria-pressed="true"] {
+  border: var(--border-size-2) solid currentColor;
+  font-weight: var(--font-weight-7);
+}
+.check[data-energy="k"] .check-trial button[aria-pressed="true"] { color: var(--color-energy-k-text); }
+.check[data-energy="p"] .check-trial button[aria-pressed="true"] { color: var(--color-energy-p-text); }
+.check-result {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.check-verdict { font-weight: var(--font-weight-7); }
+.check[data-energy="k"] .check-verdict { color: var(--color-energy-k-text); }
+.check[data-energy="p"] .check-verdict { color: var(--color-energy-p-text); }
+
+/* Question carousel */
+.quiz {
+  display: grid;
+  gap: var(--size-2);
+  padding: var(--size-3);
+  border-radius: var(--radius-3);
+  background: var(--surface-2);
+  overflow: clip;
+}
+.quiz-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.quiz-count {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.quiz-card {
+  display: grid;
+  gap: var(--size-2);
+  touch-action: pan-y;
+}
+.quiz-answers[data-n="2"] { grid-template-columns: repeat(2, 1fr); }
+.quiz-answers[data-n="3"] { grid-template-columns: 1fr; }
+.quiz-feedback[data-level="ok"] { color: var(--color-ok); font-weight: var(--font-weight-6); }
+/* Wrong answers are red, not orange: in lesson 17 orange means Ek */
+.quiz-feedback[data-level="warn"] { color: var(--color-danger); font-weight: var(--font-weight-6); }
+.quiz-nocheck { color: var(--text-2); }
+.quiz-check {
+  min-block-size: var(--touch-target);
+  justify-self: start;
+  padding-inline: var(--size-4);
+  border: var(--border-size-2) solid currentColor;
+  font-weight: var(--font-weight-7);
+}
+.quiz-check[data-tab="k"] { color: var(--color-energy-k-text); }
+.quiz-check[data-tab="p"] { color: var(--color-energy-p-text); }
+.quiz-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.quiz-arrow {
+  min-inline-size: var(--touch-target);
+  min-block-size: var(--touch-target);
+  font-size: var(--font-size-4);
+  line-height: 1;
+}
+.quiz-dots { display: flex; }
+.quiz-dot {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-7);
+  block-size: var(--size-7);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.quiz-dot span {
+  inline-size: var(--size-2);
+  block-size: var(--size-2);
+  border-radius: var(--radius-round);
+  background: var(--surface-4);
+}
+.quiz-dot[data-state="ok"] span { background: var(--color-ok); }
+.quiz-dot[data-state="warn"] span { background: var(--color-danger); }
+.quiz-dot[aria-current] span {
+  inline-size: var(--size-3);
+  block-size: var(--size-3);
+  outline: var(--border-size-2) solid var(--color-accent);
+  outline-offset: var(--border-size-1);
+}
+
+@keyframes quiz-from-right { from { transform: translateX(var(--size-8)); opacity: 0; } }
+@keyframes quiz-from-left { from { transform: translateX(calc(-1 * var(--size-8))); opacity: 0; } }
+.quiz-card.from-right { animation: quiz-from-right 0.25s var(--ease-out-3); }
+.quiz-card.from-left { animation: quiz-from-left 0.25s var(--ease-out-3); }
+@media (prefers-reduced-motion: reduce) {
+  .quiz-card.from-right,
+  .quiz-card.from-left { animation: none; }
+}

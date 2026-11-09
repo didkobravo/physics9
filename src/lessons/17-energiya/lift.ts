@@ -15,10 +15,10 @@ import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
-import { createStageFormula } from "../../lib/stage";
+import { createStageFormula, fx } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, G, MASS_MAX, MASS_MIN, MASS_STEP, ballRadius, joules, potential, show, type MassState } from "./energy-math";
+import { E, EH, G, MASS_MAX, MASS_MIN, MASS_STEP, ballRadius, joules, potential, show, type TabCtx } from "./energy-math";
 
 const VIEW_W = 580;
 const VIEW_H = 470; // taller than Заедно: room for the F arrow above a ball at 3 m
@@ -36,10 +36,11 @@ const BAR_W = 50;
 const BAR_TOP = 130;
 const TARGET_AT = 0.85; // mgh sits at 85 % of the bar height
 
-export function mountLift(host: HTMLElement, mass0: MassState): () => void {
+export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
   // ---- state ----
-  let m = mass0.m;
-  let hTarget = 1.5; // m
+  let m = ctx.mass.m;
+  let hTarget = ctx.preset?.h ?? 1.5; // m
+  let reported = false;
   let h = 0; // m, current height of the ball bottom (continuous)
   let running = false;
 
@@ -91,9 +92,9 @@ export function mountLift(host: HTMLElement, mass0: MassState): () => void {
   const formula = createStageFormula(svg, {
     x: 14,
     lines: [
-      { y: 28, size: 18, cls: "rule" },
-      { y: 54, size: 17 },
-      { y: 80, size: 17, cls: "sub" },
+      { y: 28, size: 18, cls: "work" },
+      { y: 54, size: 17, cls: "work" },
+      { y: 80, size: 17 },
     ],
   });
 
@@ -117,6 +118,7 @@ export function mountLift(host: HTMLElement, mass0: MassState): () => void {
   const restart = () => {
     h = 0;
     running = false;
+    reported = false;
   };
   const offs = [
     height.onInput((x) => {
@@ -125,7 +127,7 @@ export function mountLift(host: HTMLElement, mass0: MassState): () => void {
     }),
     mass.onInput((x) => {
       m = x;
-      mass0.set(m);
+      ctx.mass.set(m);
       restart();
     }),
   ];
@@ -153,7 +155,7 @@ export function mountLift(host: HTMLElement, mass0: MassState): () => void {
     const r = ballRadius(m);
     const bottomY = toSvg({ x: 0, y: h }).y;
     const cy = bottomY - r;
-    setAttrs(ball, { cx: BALL_X, cy, r });
+    setAttrs(ball, { cx: BALL_X, cy, r, class: h > 0 ? "ball lifted" : "ball" });
     setAttrs(ballLabel, { x: BALL_X, y: cy + 4 });
     ballLabel.textContent = `${num(m, m % 1 ? 1 : 0)} kg`;
 
@@ -178,50 +180,49 @@ export function mountLift(host: HTMLElement, mass0: MassState): () => void {
     // Bar: exact work so far; mgh of the target marked
     const goal = m * G * hTarget;
     meter.setRange(0, goal / TARGET_AT);
-    meter.set(m * G * h, done ? "bar-ep" : "meter-bar-pos");
+    // Work is neutral while it is being done; at the top it has become Eп
+    meter.set(m * G * h, done ? "bar-ep" : "bar-work");
     const gy = meter.y(goal);
     setAttrs(goalLine, { y1: gy, y2: gy });
     setAttrs(goalLabel, { y: gy + 5 });
     barName.innerHTML = done ? E("п") : sym("A");
+    setAttrs(barName, { class: done ? "scene-label lab-p" : "scene-label" });
 
-    // Stage formula
+    // Stage formula: neutral work while lifting, blue Eп at the top
     const mTxt = `${num(m, 1)} kg`;
     const hTxt = `${num(hCm / 100, 2)} m`;
-    const fTxt = `F = ${sym("m")}${sym("g")} = ${mTxt} · ${num(G, 1)} m/s² = ${num(m * G, 1)} N`;
-    if (done) {
-      formula.set(
-        [
-          `${E("п")} = ${sym("A")} = ${sym("m")}${sym("g")}${sym("h")}`,
-          `${E("п")} = ${mTxt} · ${num(G, 1)} m/s² · ${hTxt} ${show(A)}`,
-          fTxt,
-        ],
-        "ep-done",
-      );
-    } else {
-      formula.set(
-        [
-          `${sym("A")} = ${sym("F")}·${sym("s")} = ${sym("m")}${sym("g")}·${sym("h")}`,
-          `${sym("A")} = ${mTxt} · ${num(G, 1)} m/s² · ${hTxt} ${show(A)}`,
-          fTxt,
-        ],
-        "",
-      );
+    const cls = done ? "ep" : "work";
+    const fLine = fx(`${sym("F")} = ${sym("m")}${sym("g")}`, `= ${mTxt} · ${num(G, 1)} m/s²`, `= ${num(m * G, 1)} N`);
+    formula.set([
+      {
+        markup: done
+          ? fx(`${E("п")} = ${sym("A")} = ${sym("m")}${sym("g")}${sym("h")}`)
+          : fx(`${sym("A")} = ${sym("F")}·${sym("s")} = ${sym("m")}${sym("g")}·${sym("h")}`),
+        cls,
+      },
+      { markup: fx(done ? E("п") : sym("A"), `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`, show(A)), cls },
+      fLine,
+    ]);
+
+    if (done && !reported) {
+      reported = true;
+      ctx.onDone?.({ h: hCm / 100, ep: joules(A), m });
     }
 
     runBtn.textContent = running ? "❚❚ Пауза" : done ? "↻ Вдигни отново" : "▶ Вдигни";
     let text: string;
     let level: Level = "neutral";
     if (done) {
-      text = `Горе. Работата се е запазила като Eп = A = ${num(joules(A), 1)} J.`;
-      level = "ok";
+      text = `Горе. Работата се е запазила като ${EH("п")} = <i>A</i> = ${num(joules(A), 1)} J.`;
+      level = "p";
     } else if (running) {
-      text = "Вдигаме с постоянна скорост: F = mg, A расте.";
+      text = "Вдигаме с постоянна скорост: <i>F</i> = <i>mg</i>, <i>A</i> расте.";
     } else if (h > 0) {
       text = "Пауза.";
     } else {
       text = "Натисни „Вдигни“.";
     }
-    status.set(text, level);
+    status.set(text, level, true);
   }
 
   const stop = startLoop((dt) => {

@@ -15,10 +15,10 @@ import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
-import { createStageFormula } from "../../lib/stage";
+import { createStageFormula, fx } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, MASS_MAX, MASS_MIN, MASS_STEP, kinetic, show, workFx, type MassState } from "./energy-math";
+import { E, EH, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, show, workFx, type TabCtx } from "./energy-math";
 
 const SLOW = 2;
 
@@ -44,11 +44,12 @@ const EK_X = 500;
 const BAR_TOP = 120;
 const GOAL_AT = 0.85;
 
-export function mountPush(host: HTMLElement, mass0: MassState): () => void {
+export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
   // ---- state ----
-  let m = mass0.m;
-  let F = 4; // N
-  let s = 1; // m, length of the push
+  let m = ctx.mass.m;
+  let F = ctx.preset?.F ?? 4; // N
+  let s = ctx.preset?.s ?? 1; // m, length of the push
+  let reported = false; // onDone fired for this run
   let t = 0; // s of simulated time
   let running = false;
 
@@ -118,11 +119,11 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
   const goalLine = svgEl("line", { class: "total-line", x1: A_X - 8, x2: EK_X + BAR_W + 8 }, svg);
   const goalLabel = svgEl("text", { class: "scene-small", x: A_X - 12, "font-size": 15, "text-anchor": "end" }, svg);
   goalLabel.innerHTML = `${sym("F")}·${sym("s")}`;
-  for (const [x, name] of [
-    [A_X, sym("A")],
-    [EK_X, E("k")],
+  for (const [x, name, cls] of [
+    [A_X, sym("A"), "scene-label"],
+    [EK_X, E("k"), "scene-label lab-k"],
   ] as const) {
-    const lab = svgEl("text", { class: "scene-label", x: x + BAR_W / 2, y: BAR_TOP - 10, "font-size": 18, "text-anchor": "middle" }, svg);
+    const lab = svgEl("text", { class: cls, x: x + BAR_W / 2, y: BAR_TOP - 10, "font-size": 18, "text-anchor": "middle" }, svg);
     lab.innerHTML = name;
   }
 
@@ -131,7 +132,7 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
     lines: [
       { y: 28, size: 17, cls: "work" },
       { y: 54, size: 17, cls: "ek" },
-      { y: 82, size: 18, cls: "rule" },
+      { y: 82, size: 18, cls: "ek" },
     ],
   });
 
@@ -156,6 +157,7 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
   const restart = () => {
     t = 0;
     running = false;
+    reported = false;
   };
   const offs = [
     force.onInput((x) => {
@@ -168,7 +170,7 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
     }),
     mass.onInput((x) => {
       m = x;
-      mass0.set(m);
+      ctx.mass.set(m);
       restart();
     }),
   ];
@@ -209,7 +211,7 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
     const left = toSvg({ x: START + st.x, y: 0 }).x;
     const w = CART_W * SCALE;
     const bodyTop = groundY - 2 * WHEEL_R - CART_H * SCALE + 4;
-    setAttrs(body, { x: left, y: bodyTop });
+    setAttrs(body, { x: left, y: bodyTop, class: st.vCm > 0 ? "cart moving" : "cart" });
     wheels.forEach((wh) => setAttrs(wh, { cx: left + Number(wh.getAttribute("data-f")) * w, cy: groundY - WHEEL_R }));
     setAttrs(massLabel, { x: left + w / 2, y: bodyTop + CART_H * SCALE / 2 + 4 });
     massLabel.textContent = `${num(m, m % 1 ? 1 : 0)} kg`;
@@ -237,7 +239,8 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
     const now = (F * st.xCm) / 100;
     aMeter.setRange(0, goal / GOAL_AT);
     ekMeter.setRange(0, goal / GOAL_AT);
-    aMeter.set(now, "meter-bar-pos");
+    // Work is neutral while it is being done; once the push ends it has become Ek
+    aMeter.set(now, st.pushing ? "bar-work" : "bar-ek");
     ekMeter.set(now, "bar-ek");
     const gy = aMeter.y(goal);
     setAttrs(goalLine, { y1: gy, y2: gy });
@@ -247,32 +250,38 @@ export function mountPush(host: HTMLElement, mass0: MassState): () => void {
     const xName = st.pushing ? sym("x") : sym("s");
     const xTxt = `${num(st.xCm / 100, 2)} m`;
     const vTxt = `${num(st.vCm / 100, 2)} m/s`;
-    formula.set(
-      [
-        `${sym("A")} = ${sym("F")}·${xName} = ${F} N · ${xTxt} ${show(A)}`,
-        `${E("k")} = ${sym("m")}${sym("v")}²/2 = ${num(m, 1)} kg · (${vTxt})² / 2 ${show(ek)}`,
-        `${E("k")} = ${sym("A")}`,
-      ],
-      "",
-    );
+    formula.set([
+      {
+        markup: fx(`${sym("A")} = ${sym("F")}·${xName}`, `= ${F} N · ${xTxt}`, show(A)),
+        cls: st.pushing ? "work" : "ek",
+      },
+      fx(`${E("k")} = ${sym("m")}${sym("v")}²/2`, `= ${num(m, 1)} kg · (${vTxt})² / 2`, show(ek)),
+      fx(`${E("k")} = ${sym("A")}`),
+    ]);
+
+    if (done && !reported) {
+      reported = true;
+      ctx.onDone?.({ v: st.vCm / 100, ek: joules(ek), A: joules(A), m, F, s });
+    }
 
     runBtn.textContent = running ? "❚❚ Пауза" : done ? "↻ Бутни отново" : "▶ Бутни";
+    const Ek = EH("k");
     let text: string;
     let level: Level = "neutral";
     if (done) {
-      text = `Количката носи Ek = A = ${num(A.units / 100, 2)} J и продължава с v = ${num(st.vCm / 100, 2)} m/s.`;
-      level = "ok";
+      text = `Количката носи ${Ek} = <i>A</i> = ${num(joules(A), 2)} J и продължава с <i>v</i> = ${num(st.vCm / 100, 2)} m/s.`;
+      level = "k";
     } else if (!running && t === 0) {
-      text = "Количката стои: v = 0, Ek = 0. Натисни „Бутни“.";
+      text = `Количката стои: <i>v</i> = 0, ${Ek} = 0. Натисни „Бутни“.`;
     } else if (!running) {
       text = "Пауза.";
     } else if (st.pushing) {
-      text = "Бутаме: A расте и Ek расте точно толкова.";
+      text = `Бутаме: <i>A</i> расте и ${Ek} расте точно толкова.`;
     } else {
-      text = "Бутането спря. Без триене v не се променя, Ek = A.";
-      level = "ok";
+      text = `Бутането спря. Без триене <i>v</i> не се променя, ${Ek} = <i>A</i>.`;
+      level = "k";
     }
-    status.set(text, level);
+    status.set(text, level, true);
   }
 
   const stop = startLoop((dt) => {

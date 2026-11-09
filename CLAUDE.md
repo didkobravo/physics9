@@ -21,6 +21,20 @@ The site is in Bulgarian. One page per lesson. Live site: GitHub Pages at `/phys
   E<sub>k</sub> for kinetic energy with a LATIN k, E<sub>п</sub> for potential
   energy with a CYRILLIC п (in plain text: Ek / Eп). Never Cyrillic к for
   kinetic, never Latin p for potential, never Eₖ / Eₚ.
+- Energy colours (estate rule, tokens in `src/styles/tokens.css`):
+  `--color-energy-k` (orange) for everything E<sub>k</sub>, `--color-energy-p`
+  (blue) for everything E<sub>п</sub>: bars, bar labels, formula symbols,
+  status text, buttons, ball/cart highlights. Text and filled buttons use the
+  darker `-text` variants for contrast. Work A stays neutral (`--color-work`)
+  until it has become an energy, then takes that energy's colour. Don't use
+  orange or blue for anything else next to energies (wrong answers are red).
+- Stage formulas go through `fx(formula, subst, result)` in `src/lib/stage.ts`:
+  the formula bold, the substituted values thin and faded, the result at full
+  strength in the line's colour.
+- Formulas and subscripts use the standard Cyrillic letterforms, not the
+  Bulgarian localized ones (where п looks like n): `font-feature-settings:
+  "locl" 0` for Chrome/Firefox, plus `lang="ru"` on the subscript element
+  itself, because Safari ignores `locl 0`. Body text stays `lang="bg"`.
 - State every simplifying assumption on the page in plain Bulgarian (e.g. "no
   sliding", "air resistance is ignored"). If a simulation ignores an effect a
   sharp student could notice (friction, sliding before tipping, air drag),

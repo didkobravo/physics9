@@ -17,7 +17,7 @@ import { html, slider } from "../../lib/dom";
 import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createArrow, createScene } from "../../lib/scene";
-import { createStageFormula } from "../../lib/stage";
+import { createStageFormula, fx } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { pointsAttr, setAttrs, svgEl, sym, type Pt } from "../../lib/svg";
 
@@ -83,7 +83,7 @@ export function mountTipping(host: HTMLElement): () => void {
     x: 16,
     lines: [
       { y: 34, size: 21, cls: "rule" },
-      { y: 62, size: 17, cls: "sub" },
+      { y: 62, size: 17 },
     ],
   });
   const support = svgEl("line", { class: "support" }, svg);
@@ -354,7 +354,7 @@ export function mountTipping(host: HTMLElement): () => void {
       }
     }
     const critDeg = (Math.atan(b / h) * 180) / Math.PI;
-    const tg = `tg ${sym("θ")} = ${sym("b")}/${sym("h")} = ${num(b, 2)} / ${num(h, 2)} → пада при ${num(critDeg, 1)}°`;
+    const tg = fx(`tg ${sym("θ")} = ${sym("b")}/${sym("h")}`, `= ${num(b, 2)} / ${num(h, 2)}`, `→ пада при ${num(critDeg, 1)}°`);
     formula.set([rule, tg], cls);
 
     // Status line

@@ -41,16 +41,27 @@
 }
 
 :root {
-  --color-energy-p: var(--blue-6);
+  /* Energy colours, used for everything that belongs to that energy:
+     bars, labels, formula symbols, status text, buttons, highlights.
+     The plain token is for fills and strokes; the -text token is the
+     darker shade for text and filled buttons (readable contrast). */
   --color-energy-k: var(--orange-6);
+  --color-energy-k-text: var(--orange-10);
+  --color-energy-p: var(--blue-6);
+  --color-energy-p-text: var(--blue-9);
+  /* Work stays neutral until it has become an energy */
+  --color-work: var(--gray-6);
   --color-ball: var(--pink-6);
   --color-ball-edge: var(--pink-9);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-energy-p: var(--blue-4);
     --color-energy-k: var(--orange-4);
+    --color-energy-k-text: var(--orange-3);
+    --color-energy-p: var(--blue-4);
+    --color-energy-p-text: var(--blue-3);
+    --color-work: var(--gray-5);
     --color-ball: var(--pink-5);
     --color-ball-edge: var(--pink-2);
   }

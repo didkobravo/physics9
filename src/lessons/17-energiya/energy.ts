@@ -17,10 +17,10 @@ import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
-import { createStageFormula } from "../../lib/stage";
+import { createStageFormula, fx } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, G, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, potential, show, ballRadius, type MassState } from "./energy-math";
+import { E, G, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, potential, show, ballRadius, EH, type TabCtx } from "./energy-math";
 
 const SLOW = 4; // slow-motion factor
 
@@ -41,10 +41,11 @@ const EK_X = 482;
 const BAR_TOP = 130;
 const TOTAL_AT = 0.85; // the total sits at 85 % of the bar height
 
-export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
+export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
   // ---- state ----
-  let h0 = 1.5; // m
-  let m = mass0.m; // kg, shared with the other tabs
+  let h0 = ctx.preset?.h ?? 1.5; // m
+  let m = ctx.mass.m; // kg, shared with the other tabs
+  let reported = false;
   let t = 0; // s of simulated time since release
   let running = false;
 
@@ -109,7 +110,7 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
     [EK_X, "k"],
   ] as const) {
     // Names sit above the bars (below them the subscript would be clipped by the stage edge)
-    const lab = svgEl("text", { class: "scene-label", x: x + BAR_W / 2, y: BAR_TOP - 10, "font-size": 18, "text-anchor": "middle" }, svg);
+    const lab = svgEl("text", { class: `scene-label lab-${sub === "п" ? "p" : "k"}`, x: x + BAR_W / 2, y: BAR_TOP - 10, "font-size": 18, "text-anchor": "middle" }, svg);
     lab.innerHTML = E(sub);
   }
 
@@ -119,7 +120,7 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
     lines: [
       { y: 28, size: 17, cls: "ep" },
       { y: 54, size: 17, cls: "ek" },
-      { y: 82, size: 18, cls: "rule" },
+      { y: 82, size: 18 },
     ],
   });
 
@@ -143,6 +144,7 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
   const restart = () => {
     t = 0;
     running = false;
+    reported = false;
   };
   const offs = [
     height.onInput((x) => {
@@ -152,7 +154,7 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
     mass.onInput((x) => {
       m = x;
       restart();
-      mass0.set(m);
+      ctx.mass.set(m);
     }),
   ];
   const onRun = () => {
@@ -181,7 +183,8 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
     const r = ballRadius(m);
     const bottomY = toSvg({ x: 0, y: s.hTrue }).y;
     const cy = bottomY - r;
-    setAttrs(ball, { cx: BALL_X, cy, r });
+    // Highlight: blue while all its energy is Eп, orange once it moves
+    setAttrs(ball, { cx: BALL_X, cy, r, class: t > 0 ? "ball moving" : "ball lifted" });
     setAttrs(ballLabel, { x: BALL_X, y: cy + 4 });
     ballLabel.textContent = `${num(m, m % 1 ? 1 : 0)} kg`;
 
@@ -220,31 +223,37 @@ export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
     const mTxt = `${num(m, 1)} kg`;
     const hTxt = `${num(s.hCm / 100, 2)} m`;
     const vTxt = `${num(s.vCm / 100, 2)} m/s`;
-    formula.set(
-      [
-        `${E("п")} = ${sym("m")}${sym("g")}${sym("h")} = ${mTxt} · ${num(G, 1)} m/s² · ${hTxt} ${show(ep)}`,
-        `${E("k")} = ${sym("m")}${sym("v")}²/2 = ${mTxt} · (${vTxt})² / 2 ${show(ek)}`,
-        `${E("п")} + ${E("k")} = ${num(joules(ep), 1)} + ${num(joules(ek), 1)} ${adds ? "=" : "≈"} ${num(joules(total), 1)} J (не се променя)`,
-      ],
-      "",
-    );
+    formula.set([
+      fx(`${E("п")} = ${sym("m")}${sym("g")}${sym("h")}`, `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`, show(ep)),
+      fx(`${E("k")} = ${sym("m")}${sym("v")}²/2`, `= ${mTxt} · (${vTxt})² / 2`, show(ek)),
+      fx(
+        `${E("п")} + ${E("k")}`,
+        `= ${num(joules(ep), 1)} + ${num(joules(ek), 1)}`,
+        `${adds ? "=" : "≈"} ${num(joules(total), 1)} J`,
+        "(не се променя)",
+      ),
+    ]);
 
     // Controls and status
     const done = landed() && t > 0;
+    if (done && !reported) {
+      reported = true;
+      ctx.onDone?.({ v: s.vCm / 100, ek: joules(ek), ep: joules(ep), total: joules(total), h0, m });
+    }
     runBtn.textContent = running ? "❚❚ Пауза" : done ? "↻ Пусни отново" : "▶ Пусни";
     let text: string;
     let level: Level = "neutral";
     if (done) {
-      text = `Точно преди удара: цялата Eп стана Ek. v = √(2gh₀) = ${num(s.vCm / 100, 2)} m/s.`;
-      level = "ok";
+      text = `Точно преди удара: цялата ${EH("п")} стана ${EH("k")}. <i>v</i> = √(2<i>gh</i>₀) = ${num(s.vCm / 100, 2)} m/s.`;
+      level = "k";
     } else if (running) {
-      text = "Eп намалява, Ek расте — сборът остава същият.";
+      text = `${EH("п")} намалява, ${EH("k")} расте — сборът остава същият.`;
     } else if (t > 0) {
       text = "Пауза.";
     } else {
       text = "Натисни „Пусни“.";
     }
-    status.set(text, level);
+    status.set(text, level, true);
   }
 
   const stop = startLoop((dt) => {

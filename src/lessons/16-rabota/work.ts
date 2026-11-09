@@ -19,7 +19,7 @@ import { num, numUpTo, signed } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
-import { createStageFormula } from "../../lib/stage";
+import { createStageFormula, fx } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym as v, type Pt } from "../../lib/svg";
 
@@ -130,7 +130,7 @@ export function mountWork(host: HTMLElement): () => void {
     x: FORMULA_X,
     lines: [
       { y: 32, size: 24, cls: "rule" },
-      { y: 60, size: 19 },
+      { y: 60, size: 19, cls: "signed" },
     ],
   });
 
@@ -232,7 +232,7 @@ export function mountWork(host: HTMLElement): () => void {
   /** Rule line + numbers line for the stage formula, and its colour class. */
   function stageFormula(A: number, s: number): { rule: string; nums: string; cls: string } {
     if (wall) {
-      return { rule: `${v("s")} = 0 → ${v("A")} = 0`, nums: `${v("A")} = ${WALL_F} N · 0 m = 0 J`, cls: "zero" };
+      return { rule: `${v("s")} = 0 → ${v("A")} = 0`, nums: fx(v("A"), `= ${WALL_F} N · 0 m`, "= 0 J"), cls: "zero" };
     }
     const rule =
       dir === 1 ? `${v("A")} = +${v("F")}·${v("s")}` : dir === -1 ? `${v("A")} = −${v("F")}·${v("s")}` : `${v("F")} ⊥ ${v("s")} → ${v("A")} = 0`;
@@ -244,9 +244,9 @@ export function mountWork(host: HTMLElement): () => void {
     let nums: string;
     if (single) {
       const sTxt = `${num(s, 2)} m`;
-      if (dir === 1) nums = `${v("A")} = +${F} N · ${sTxt} = ${signed(A)} J`;
-      else if (dir === -1) nums = `${v("A")} = −${F} N · ${sTxt} = ${signed(A)} J`;
-      else nums = `${F} N ⊥ ${sTxt} → ${v("A")} = 0 J`;
+      if (dir === 1) nums = fx(v("A"), `= +${F} N · ${sTxt}`, `= ${signed(A)} J`);
+      else if (dir === -1) nums = fx(v("A"), `= −${F} N · ${sTxt}`, `= ${signed(A)} J`);
+      else nums = fx(v("A"), `(${F} N ⊥ ${sTxt})`, "= 0 J");
     } else {
       // Several pieces: show how they add up
       const terms = pieces.map((g, i) => {
@@ -256,7 +256,7 @@ export function mountWork(host: HTMLElement): () => void {
         return `${w < 0 ? "−" : "+"} ${t}`;
       });
       const shown = terms.length > 4 ? ["…", ...terms.slice(-3)] : terms;
-      nums = `${v("A")} = ${shown.join(" ")} = ${signed(A)} J`;
+      nums = fx(v("A"), `= ${shown.join(" ")}`, `= ${signed(A)} J`);
     }
     return { rule, nums, cls };
   }

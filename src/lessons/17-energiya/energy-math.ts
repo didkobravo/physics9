@@ -36,13 +36,26 @@ export const show = (r: Rounded) => `${r.exact ? "=" : "≈"} ${num(joules(r), r
 
 /**
  * E with its subscript, for SVG text: Latin k for kinetic, Cyrillic п for
- * potential, as in the textbook. The subscript is upright (an italic п
- * looks like a Latin n).
+ * potential, as in the textbook. The subscript is upright and must not use
+ * the Bulgarian localized letterforms (where п looks like an n). Chrome and
+ * Firefox honour `font-feature-settings: "locl" 0` (class "std"); Safari
+ * ignores it and only switches forms by language, hence lang="ru" on the
+ * subscript alone (Russian uses the standard п).
  */
-export const E = (sub: "п" | "k") => `${sym("E")}<tspan baseline-shift="sub" font-size="70%" font-style="normal">${sub}</tspan>`;
+export const E = (sub: "п" | "k") => `${sym("E")}<tspan baseline-shift="sub" font-size="70%" font-style="normal" class="std" lang="ru">${sub}</tspan>`;
 
 /** Shared mass across the three tabs: it is the same ball (or cart) everywhere. */
 export type MassState = { m: number; set: (m: number) => void };
+
+/** Slider values a tab can be opened with (from a quiz "Провери"). */
+export type Preset = { m?: number; F?: number; s?: number; h?: number };
+/** What a tab reports when a run finishes. */
+export type TabResult = Record<string, number>;
+export type TabCtx = { mass: MassState; preset?: Preset; onDone?: (r: TabResult) => void };
+
+/** Same markup in HTML (status lines, page copy). */
+export const EH = (sub: "п" | "k") => `E<sub lang="ru">${sub}</sub>`;
+
 export const MASS_MIN = 0.5;
 export const MASS_MAX = 5;
 export const MASS_STEP = 0.5;
