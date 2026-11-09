@@ -1,7 +1,7 @@
 /**
- * Predict-then-reveal: "if the speed doubles, how many times does Eк grow?"
- * After either answer, a speed slider (0 … 2·v₀) drives an Eк bar with
- * markers at 1×, 2× (the tempting wrong answer) and 4× Eк(v₀).
+ * Predict-then-reveal: "if the speed doubles, how many times does Ek grow?"
+ * After either answer, a speed slider (0 … 2·v₀) drives an Ek bar with
+ * markers at 1×, 2× (the tempting wrong answer) and 4× Ek(v₀).
  * All numbers are exact: v in 0,1 m/s steps, m in 0,5 kg steps.
  */
 import { html, slider } from "../../lib/dom";
@@ -13,11 +13,11 @@ const W = 580;
 const X0 = 20;
 const X1 = 560;
 
-export function mountPredict(host: HTMLElement) {
-  let m = 2;
+export function mountPredict(host: HTMLElement, mass: number) {
+  let m = mass;
   const root = html(`
     <section class="predict">
-      <p><b>Познай:</b> ако скоростта стане 2 пъти по-голяма, колко пъти расте E<sub>к</sub>?</p>
+      <p><b>Познай:</b> ако скоростта стане 2 пъти по-голяма, колко пъти расте E<sub>k</sub>?</p>
       <div class="seg" role="group" aria-label="Твоят отговор">
         <button type="button" data-answer="2">2×</button>
         <button type="button" data-answer="4">4×</button>
@@ -34,7 +34,7 @@ export function mountPredict(host: HTMLElement) {
   const formulaEl = root.querySelector<HTMLElement>(".predict-formula")!;
   const answers = [...root.querySelectorAll<HTMLButtonElement>("[data-answer]")];
 
-  // Horizontal Eк bar with markers
+  // Horizontal Ek bar with markers
   const svg = svgEl("svg", { viewBox: `0 0 ${W} 96`, role: "img", "aria-label": "Кинетична енергия при скорост v" });
   svgEl("rect", { class: "track", x: X0, y: 34, width: X1 - X0, height: 30, rx: 4 }, svg);
   const bar = svgEl("rect", { class: "bar-ek", x: X0 + 3, y: 37, height: 24 }, svg);
@@ -50,7 +50,7 @@ export function mountPredict(host: HTMLElement) {
   root.querySelector("[data-slider]")!.append(speed.root);
   host.append(root);
 
-  // Scale: 4·Eк(v₀) sits at 90 % of the track, independent of m
+  // Scale: 4·Ek(v₀) sits at 90 % of the track, independent of m
   const xOf = (ratio: number) => X0 + 3 + (ratio / 4) * 0.9 * (X1 - X0 - 6);
 
   function render() {
@@ -67,8 +67,8 @@ export function mountPredict(host: HTMLElement) {
     const vTxt = `${num(v, 1)} m/s`;
     const times = Math.abs(v - 2 * V0) < 1e-9 ? "2" : numUpTo(v / V0, 2);
     formulaEl.innerHTML =
-      `v = ${vTxt} = ${times} · v<sub>0</sub> → E<sub>к</sub> = ${num(m, 1)} kg · (${vTxt})² / 2 = ${numUpTo(ek, 4)} J` +
-      ` = ${numUpTo(ratio, 4)} × E<sub>к</sub>(v<sub>0</sub>) (${numUpTo(ek0, 4)} J)`;
+      `v = ${vTxt} = ${times} · v<sub>0</sub> → E<sub>k</sub> = ${num(m, 1)} kg · (${vTxt})² / 2 = ${numUpTo(ek, 4)} J` +
+      ` = ${numUpTo(ratio, 4)} × E<sub>k</sub>(v<sub>0</sub>) (${numUpTo(ek0, 4)} J)`;
     formulaEl.classList.toggle("hit", Math.abs(v - 2 * V0) < 1e-9);
   }
 
@@ -79,7 +79,7 @@ export function mountPredict(host: HTMLElement) {
       feedback.textContent = "Точно! Скоростта е на квадрат: 2² = 4. Провери с плъзгача.";
       feedback.dataset.level = "ok";
     } else {
-      feedback.textContent = "Не съвсем — Eк зависи от v², не от v. Провери с плъзгача:";
+      feedback.textContent = "Не съвсем — Ek зависи от v², не от v. Провери с плъзгача:";
       feedback.dataset.level = "warn";
     }
     reveal.hidden = false;

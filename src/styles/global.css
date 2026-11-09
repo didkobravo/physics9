@@ -257,7 +257,8 @@ input[type="range"]:disabled {
   padding-inline: var(--size-2);
 }
 
-.seg button[aria-pressed="true"] {
+.seg button[aria-pressed="true"],
+.seg button[aria-selected="true"] {
   border: var(--border-size-2) solid var(--color-accent);
   color: var(--color-accent);
   font-weight: var(--font-weight-7);
@@ -354,3 +355,20 @@ button:disabled {
 .marker-label { fill: var(--text-1); font-family: var(--font-sans); }
 .marker-label.dim { fill: var(--text-2); }
 .track { fill: var(--surface-1); stroke: var(--text-2); stroke-width: 2; }
+
+/* Lesson 17 tabs and the lift / push scenes */
+.notes {
+  display: grid;
+  gap: var(--size-3);
+}
+
+.tabs button {
+  font-weight: var(--font-weight-6);
+}
+
+.cart { fill: var(--color-ball); stroke: var(--color-ball-edge); stroke-width: 2.5; }
+.wheel { fill: var(--gray-7); stroke: var(--gray-9); stroke-width: 2; }
+.push-zone { fill: var(--color-ok); opacity: 0.6; }
+.target-line { stroke: var(--text-2); stroke-width: 2; stroke-dasharray: 6 4; }
+.stage-formula .work { fill: var(--color-ok); }
+.stage-formula.ep-done .rule { fill: var(--color-energy-p); }

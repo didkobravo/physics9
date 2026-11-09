@@ -34,7 +34,7 @@ current work.
 
 ## Lesson 17 — Кинетична и потенциална енергия
 
-- Moon g toggle: drop the same ball with g = 1,6 m/s² and compare Eп, Eк
+- Moon g toggle: drop the same ball with g = 1,6 m/s² and compare Eп, Ek
   and the landing speed.
 - Choosing the zero level: measure h from the floor or from the table top,
   showing that Eп depends on the chosen level but the change in Eп does not.

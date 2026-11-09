@@ -18,8 +18,9 @@ The site is in Bulgarian. One page per lesson. Live site: GitHub Pages at `/phys
 - `reference/` holds private textbook scans. Never commit it (it is in
   `.gitignore`) and never copy its text verbatim. Re-explain in our own words.
 - Notation follows the Bulgarian textbook: `A` for work, `P` for power,
-  `Eк` / `Eп` with Cyrillic subscripts (written as Eк / Eп or E<sub>к</sub>).
-  Never Eₖ / Eₚ or Latin k / p.
+  E<sub>k</sub> for kinetic energy with a LATIN k, E<sub>п</sub> for potential
+  energy with a CYRILLIC п (in plain text: Ek / Eп). Never Cyrillic к for
+  kinetic, never Latin p for potential, never Eₖ / Eₚ.
 - State every simplifying assumption on the page in plain Bulgarian (e.g. "no
   sliding", "air resistance is ignored"). If a simulation ignores an effect a
   sharp student could notice (friction, sliding before tipping, air drag),

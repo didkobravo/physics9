@@ -1,5 +1,5 @@
 /**
- * Lesson 17 tracer: a ball dropped from height h₀; Eп turns into Eк.
+ * Lesson 17 tracer: a ball dropped from height h₀; Eп turns into Ek.
  *
  * Model (stated on the page): free fall without air resistance, worked out
  * exactly rather than stepped: h = h₀ − g t²/2. The fall plays 4× slower
@@ -7,7 +7,7 @@
  *
  * Every number on the stage is checkable by hand. The displayed state is
  * (h, v) with h in whole centimetres and v = √(2g(h₀ − h)) rounded to
- * 0,01 m/s. Eп is computed from the h shown and Eк from the v shown, each
+ * 0,01 m/s. Eп is computed from the h shown and Ek from the v shown, each
  * with "=" when the product is exact at 0,1 J and "≈" when it is rounded.
  * The sum line shows "≈" whenever the two rounded energies do not add up to
  * the rounded total m·g·h₀.
@@ -20,8 +20,8 @@ import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
+import { E, G, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, potential, show, ballRadius, type MassState } from "./energy-math";
 
-export const G = 9.8; // m/s², as in the textbook
 const SLOW = 4; // slow-motion factor
 
 const VIEW_W = 580;
@@ -41,28 +41,10 @@ const EK_X = 482;
 const BAR_TOP = 130;
 const TOTAL_AT = 0.85; // the total sits at 85 % of the bar height
 
-/** Eп and Eк symbols with Cyrillic subscripts, for SVG text. */
-const E = (sub: "п" | "к") => `${sym("E")}<tspan baseline-shift="sub" font-size="70%">${sub}</tspan>`;
-
-/** Energy in tenths of a joule: exact integer arithmetic so "=" vs "≈" is honest. */
-type Tenths = { tenths: number; exact: boolean };
-const show = (t: Tenths) => `${t.exact ? "=" : "≈"} ${num(t.tenths / 10, 1)} J`;
-
-/** Eп = m·g·h with m in 0,1 kg, h in cm (g = 9,8 → 98 in 0,1 m/s²). */
-function potential(m10: number, hCm: number): Tenths {
-  const raw = m10 * 98 * hCm; // units of 1e-4 J
-  return { tenths: Math.round(raw / 1000), exact: raw % 1000 === 0 };
-}
-/** Eк = m·v²/2 with m in 0,1 kg, v in cm/s. */
-function kinetic(m10: number, vCm: number): Tenths {
-  const raw = m10 * vCm * vCm; // units of 2e-5 J (÷10 kg, ÷1e4 m², ÷2)
-  return { tenths: Math.round(raw / 20000), exact: raw % 20000 === 0 };
-}
-
-export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): () => void {
+export function mountEnergy(host: HTMLElement, mass0: MassState): () => void {
   // ---- state ----
   let h0 = 1.5; // m
-  let m = 2; // kg
+  let m = mass0.m; // kg, shared with the other tabs
   let t = 0; // s of simulated time since release
   let running = false;
 
@@ -121,10 +103,10 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
   const ekMeter = createBarMeter(svg, { x: EK_X, top: BAR_TOP, bottom: groundY, width: BAR_W, min: 0, max: 1 });
   const totalLine = svgEl("line", { class: "total-line", x1: EP_X - 8, x2: EK_X + BAR_W + 8 }, svg);
   const totalLabel = svgEl("text", { class: "scene-small", x: EP_X - 12, "font-size": 15, "text-anchor": "end" }, svg);
-  totalLabel.innerHTML = `${E("п")} + ${E("к")}`;
+  totalLabel.innerHTML = `${E("п")} + ${E("k")}`;
   for (const [x, sub] of [
     [EP_X, "п"],
-    [EK_X, "к"],
+    [EK_X, "k"],
   ] as const) {
     // Names sit above the bars (below them the subscript would be clipped by the stage edge)
     const lab = svgEl("text", { class: "scene-label", x: x + BAR_W / 2, y: BAR_TOP - 10, "font-size": 18, "text-anchor": "middle" }, svg);
@@ -149,7 +131,7 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
   actionRow.append(runBtn, restartBtn);
 
   const height = slider({ label: "Височина h", min: H_MIN, max: H_MAX, step: 0.05, value: h0, format: (x) => `${num(x, 2)} m` });
-  const mass = slider({ label: "Маса m", min: 0.5, max: 5, step: 0.5, value: m, format: (x) => `${num(x, 1)} kg` });
+  const mass = slider({ label: "Маса m", min: MASS_MIN, max: MASS_MAX, step: MASS_STEP, value: m, format: (x) => `${num(x, 1)} kg` });
   const controls = html(`<div class="controls"></div>`);
   controls.append(height.root, mass.root);
 
@@ -170,7 +152,7 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
     mass.onInput((x) => {
       m = x;
       restart();
-      onMass?.(m);
+      mass0.set(m);
     }),
   ];
   const onRun = () => {
@@ -193,10 +175,10 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
     const ep = potential(m10, s.hCm);
     const ek = kinetic(m10, s.vCm);
     const total = potential(m10, s.h0Cm);
-    const adds = ep.tenths + ek.tenths === total.tenths;
+    const adds = ep.units + ek.units === total.units;
 
     // Ball (h measured to its bottom), radius grows gently with mass
-    const r = 12 + 4 * Math.cbrt(m);
+    const r = ballRadius(m);
     const bottomY = toSvg({ x: 0, y: s.hTrue }).y;
     const cy = bottomY - r;
     setAttrs(ball, { cx: BALL_X, cy, r });
@@ -241,8 +223,8 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
     formula.set(
       [
         `${E("п")} = ${sym("m")}${sym("g")}${sym("h")} = ${mTxt} · ${num(G, 1)} m/s² · ${hTxt} ${show(ep)}`,
-        `${E("к")} = ${sym("m")}${sym("v")}²/2 = ${mTxt} · (${vTxt})² / 2 ${show(ek)}`,
-        `${E("п")} + ${E("к")} = ${num(ep.tenths / 10, 1)} + ${num(ek.tenths / 10, 1)} ${adds ? "=" : "≈"} ${num(total.tenths / 10, 1)} J (не се променя)`,
+        `${E("k")} = ${sym("m")}${sym("v")}²/2 = ${mTxt} · (${vTxt})² / 2 ${show(ek)}`,
+        `${E("п")} + ${E("k")} = ${num(joules(ep), 1)} + ${num(joules(ek), 1)} ${adds ? "=" : "≈"} ${num(joules(total), 1)} J (не се променя)`,
       ],
       "",
     );
@@ -253,10 +235,10 @@ export function mountEnergy(host: HTMLElement, onMass?: (m: number) => void): ()
     let text: string;
     let level: Level = "neutral";
     if (done) {
-      text = `Точно преди удара: цялата Eп стана Eк. v = √(2gh₀) = ${num(s.vCm / 100, 2)} m/s.`;
+      text = `Точно преди удара: цялата Eп стана Ek. v = √(2gh₀) = ${num(s.vCm / 100, 2)} m/s.`;
       level = "ok";
     } else if (running) {
-      text = "Eп намалява, Eк расте — сборът остава същият.";
+      text = "Eп намалява, Ek расте — сборът остава същият.";
     } else if (t > 0) {
       text = "Пауза.";
     } else {
