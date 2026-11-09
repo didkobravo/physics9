@@ -62,3 +62,17 @@ export const MASS_STEP = 0.5;
 
 /** Ball radius in viewBox units; grows gently with mass. */
 export const ballRadius = (m: number) => 12 + 4 * Math.cbrt(m);
+
+/**
+ * All three tabs share one stage size and one formula position, so
+ * switching tabs never shifts the page: same viewBox, same ground line,
+ * same formula box.
+ */
+export const VIEW_W = 580;
+export const VIEW_H = 470;
+export const GROUND = 26;
+export const FORMULA_LINES = [
+  { y: 28, size: 17 },
+  { y: 54, size: 17 },
+  { y: 80, size: 17 },
+];

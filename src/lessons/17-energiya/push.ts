@@ -16,22 +16,35 @@ import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula, fx } from "../../lib/stage";
+import { chip, mountChipPopovers } from "../../lib/chips";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, EH, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, show, workFx, type TabCtx } from "./energy-math";
+import {
+  E,
+  EH,
+  FORMULA_LINES,
+  GROUND,
+  MASS_MAX,
+  MASS_MIN,
+  MASS_STEP,
+  VIEW_H,
+  VIEW_W,
+  joules,
+  kinetic,
+  show,
+  workFx,
+  type TabCtx,
+} from "./energy-math";
 
 const SLOW = 2;
 
-const VIEW_W = 580;
-const VIEW_H = 300;
-const SCALE = 110; // viewBox units per metre
-const GROUND = 40;
+const SCALE = 150; // viewBox units per metre (bigger: fills the taller shared stage)
 
 const START = 0.6; // m, cart's left edge at rest
 const TRAVEL = 2.4; // m the cart's left edge moves before we stop the picture
 const CART_W = 0.45;
 const CART_H = 0.22;
-const WHEEL_R = 7; // viewBox units
+const WHEEL_R = 10; // viewBox units
 
 const S_MIN = 0.5;
 const S_MAX = 1.5;
@@ -41,7 +54,7 @@ const F_MAX = 10;
 const BAR_W = 40;
 const A_X = 425;
 const EK_X = 500;
-const BAR_TOP = 120;
+const BAR_TOP = 130;
 const GOAL_AT = 0.85;
 
 export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
@@ -97,7 +110,7 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
   const zoneEnd = svgEl("line", { class: "target-line", y1: groundY - 70, y2: groundY }, svg);
   const zoneLabel = svgEl("text", { class: "scene-label", y: groundY - 74, "font-size": 18, "text-anchor": "middle" }, svg);
 
-  const slowLabel = svgEl("text", { class: "scene-small", x: (A_X + EK_X + BAR_W) / 2, y: groundY + 30, "font-size": 14, "text-anchor": "middle" }, svg);
+  const slowLabel = svgEl("text", { class: "scene-small", x: (A_X + EK_X + BAR_W) / 2, y: groundY + 19, "font-size": 14, "text-anchor": "middle" }, svg);
   slowLabel.textContent = `забавено ${SLOW}×`;
 
   // Cart
@@ -127,19 +140,13 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
     lab.innerHTML = name;
   }
 
-  const formula = createStageFormula(svg, {
-    x: 14,
-    lines: [
-      { y: 28, size: 17, cls: "work" },
-      { y: 54, size: 17, cls: "ek" },
-      { y: 82, size: 18, cls: "ek" },
-    ],
-  });
+  // Same stage position in all three tabs
+  const formula = createStageFormula(svg, { x: 14, lines: FORMULA_LINES });
 
   // ---- controls ----
   const status = createStatus();
   const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
-  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
+  const restartBtn = html<HTMLButtonElement>(`<button type="button" class="secondary">Отначало</button>`);
   const actionRow = html(`<div class="action-row"></div>`);
   actionRow.append(runBtn, restartBtn);
 
@@ -221,7 +228,7 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
     const pushOn = st.pushing && !done;
     fArrow.show(pushOn);
     fLabel.style.display = pushOn ? "" : "none";
-    const fLen = 30 + 5 * F;
+    const fLen = 40 + 7 * F;
     fArrow.set({ x: left - fLen, y: midY }, { x: left - 2, y: midY });
     setAttrs(fLabel, { x: left - fLen / 2 - 6, y: midY - 14 });
 
@@ -247,16 +254,20 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
     setAttrs(goalLabel, { y: gy + 5 });
 
     // Stage formula: both sides live
-    const xName = st.pushing ? sym("x") : sym("s");
+    const xKey = st.pushing ? "x" : "s";
     const xTxt = `${num(st.xCm / 100, 2)} m`;
     const vTxt = `${num(st.vCm / 100, 2)} m/s`;
+    const aVal = `${num(joules(A), 2)} J`;
+    const ekVal = `${num(joules(ek), 2)} J`;
+    const chA = chip("A", sym("A"), aVal);
+    const chEk = chip("Ek", E("k"), ekVal);
     formula.set([
       {
-        markup: fx(`${sym("A")} = ${sym("F")}·${xName}`, `= ${F} N · ${xTxt}`, show(A)),
+        markup: fx(`${chA} = ${chip("F", sym("F"), `${F} N`)}·${chip(xKey, sym(xKey), xTxt)}`, `= ${F} N · ${xTxt}`, show(A)),
         cls: st.pushing ? "work" : "ek",
       },
-      fx(`${E("k")} = ${sym("m")}${sym("v")}²/2`, `= ${num(m, 1)} kg · (${vTxt})² / 2`, show(ek)),
-      fx(`${E("k")} = ${sym("A")}`),
+      fx(`${chEk} = ${chip("m", sym("m"), `${num(m, 1)} kg`)}${chip("v", sym("v"), vTxt)}²/2`, `= ${num(m, 1)} kg · (${vTxt})² / 2`, show(ek)),
+      fx(`${chEk} = ${chA}`),
     ]);
 
     if (done && !reported) {
@@ -284,6 +295,16 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
     status.set(text, level, true);
   }
 
+  const unmountChips = mountChipPopovers(root, {
+    A: aMeter.g,
+    Ek: ekMeter.g,
+    F: fArrow.el,
+    x: zone,
+    s: zone,
+    m: cart,
+    v: [vArrow.el, vLabel],
+  });
+
   const stop = startLoop((dt) => {
     step(dt);
     render();
@@ -292,6 +313,7 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
 
   return () => {
     stop();
+    unmountChips();
     offs.forEach((off) => off());
     runBtn.removeEventListener("click", onRun);
     restartBtn.removeEventListener("click", restart);

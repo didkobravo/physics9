@@ -20,6 +20,7 @@ import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula, fx } from "../../lib/stage";
+import { chip, mountChipPopovers } from "../../lib/chips";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym as v, type Pt } from "../../lib/svg";
 
@@ -157,7 +158,7 @@ export function mountWork(host: HTMLElement): () => void {
   const status = createStatus();
 
   const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
-  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
+  const restartBtn = html<HTMLButtonElement>(`<button type="button" class="secondary">Отначало</button>`);
   const actionRow = html(`<div class="action-row"></div>`);
   actionRow.append(runBtn, restartBtn);
 
@@ -171,7 +172,7 @@ export function mountWork(host: HTMLElement): () => void {
 
   const force = slider({ label: "Сила F", min: F_MIN, max: F_MAX, step: 5, value: F, format: (x) => `${num(x)} N` });
 
-  const wallBtn = html<HTMLButtonElement>(`<button type="button"></button>`);
+  const wallBtn = html<HTMLButtonElement>(`<button type="button" class="secondary"></button>`);
   const btnRow = html(`<div class="btn-row"></div>`);
   btnRow.append(wallBtn);
 
@@ -232,10 +233,14 @@ export function mountWork(host: HTMLElement): () => void {
   /** Rule line + numbers line for the stage formula, and its colour class. */
   function stageFormula(A: number, s: number): { rule: string; nums: string; cls: string } {
     if (wall) {
-      return { rule: `${v("s")} = 0 → ${v("A")} = 0`, nums: fx(v("A"), `= ${WALL_F} N · 0 m`, "= 0 J"), cls: "zero" };
+      const chS0 = chip("s", v("s"), "0 m");
+      const chA0 = chip("A", v("A"), "0 J");
+      return { rule: `${chS0} = 0 → ${chA0} = 0`, nums: fx(chA0, `= ${WALL_F} N · 0 m`, "= 0 J"), cls: "zero" };
     }
-    const rule =
-      dir === 1 ? `${v("A")} = +${v("F")}·${v("s")}` : dir === -1 ? `${v("A")} = −${v("F")}·${v("s")}` : `${v("F")} ⊥ ${v("s")} → ${v("A")} = 0`;
+    const chA = chip("A", v("A"), `${signed(A)} J`);
+    const chF = chip("F", v("F"), `${F} N`);
+    const chS = chip("s", v("s"), `${num(s, 2)} m`);
+    const rule = dir === 1 ? `${chA} = +${chF}·${chS}` : dir === -1 ? `${chA} = −${chF}·${chS}` : `${chF} ⊥ ${chS} → ${chA} = 0`;
     const cls = dir === 1 ? "pos" : dir === -1 ? "neg" : "zero";
 
     const last = segments[segments.length - 1];
@@ -244,9 +249,9 @@ export function mountWork(host: HTMLElement): () => void {
     let nums: string;
     if (single) {
       const sTxt = `${num(s, 2)} m`;
-      if (dir === 1) nums = fx(v("A"), `= +${F} N · ${sTxt}`, `= ${signed(A)} J`);
-      else if (dir === -1) nums = fx(v("A"), `= −${F} N · ${sTxt}`, `= ${signed(A)} J`);
-      else nums = fx(v("A"), `(${F} N ⊥ ${sTxt})`, "= 0 J");
+      if (dir === 1) nums = fx(chA, `= +${F} N · ${sTxt}`, `= ${signed(A)} J`);
+      else if (dir === -1) nums = fx(chA, `= −${F} N · ${sTxt}`, `= ${signed(A)} J`);
+      else nums = fx(chA, `(${F} N ⊥ ${sTxt})`, "= 0 J");
     } else {
       // Several pieces: show how they add up
       const terms = pieces.map((g, i) => {
@@ -256,7 +261,7 @@ export function mountWork(host: HTMLElement): () => void {
         return `${w < 0 ? "−" : "+"} ${t}`;
       });
       const shown = terms.length > 4 ? ["…", ...terms.slice(-3)] : terms;
-      nums = fx(v("A"), `= ${shown.join(" ")}`, `= ${signed(A)} J`);
+      nums = fx(chA, `= ${shown.join(" ")}`, `= ${signed(A)} J`);
     }
     return { rule, nums, cls };
   }
@@ -361,6 +366,12 @@ export function mountWork(host: HTMLElement): () => void {
     status.set(text, level);
   }
 
+  const unmountChips = mountChipPopovers(root, {
+    A: workMeter.g,
+    F: fArrow.el,
+    s: sArrow.el,
+  });
+
   const stop = startLoop((dt) => {
     step(dt);
     render();
@@ -369,6 +380,7 @@ export function mountWork(host: HTMLElement): () => void {
 
   return () => {
     stop();
+    unmountChips();
     dirButtons.forEach((b) => b.removeEventListener("click", onDir));
     offForce();
     runBtn.removeEventListener("click", onRun);

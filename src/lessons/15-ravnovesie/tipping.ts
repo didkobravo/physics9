@@ -18,6 +18,7 @@ import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula, fx } from "../../lib/stage";
+import { chip, mountChipPopovers } from "../../lib/chips";
 import { createStatus, type Level } from "../../lib/status";
 import { pointsAttr, setAttrs, svgEl, sym, type Pt } from "../../lib/svg";
 
@@ -86,7 +87,10 @@ export function mountTipping(host: HTMLElement): () => void {
       { y: 62, size: 17 },
     ],
   });
-  const support = svgEl("line", { class: "support" }, svg);
+  // Wrapped in a group: the line's own class carries the colour level and is
+  // rewritten every frame, so a chip-glow goes on the (stable) group instead.
+  const supportGroup = svgEl("g", {}, svg);
+  const support = svgEl("line", { class: "support" }, supportGroup);
   const box = svgEl("polygon", { class: "box" }, svg);
   const slat1 = svgEl("line", { class: "box-slat" }, svg);
   const slat2 = svgEl("line", { class: "box-slat" }, svg);
@@ -126,7 +130,7 @@ export function mountTipping(host: HTMLElement): () => void {
     format: (v) => `${num(v, 2)} m`,
   });
   // Becomes the filled primary action only while the box is down
-  const reset = html<HTMLButtonElement>(`<button type="button">↻ Изправи кутията</button>`);
+  const reset = html<HTMLButtonElement>(`<button type="button" class="secondary">↻ Изправи кутията</button>`);
   const actionRow = html(`<div class="action-row"></div>`);
   actionRow.append(reset);
 
@@ -330,6 +334,7 @@ export function mountTipping(host: HTMLElement): () => void {
       width.input.disabled = down;
       height.input.disabled = down;
       reset.classList.toggle("primary", down);
+      reset.classList.toggle("secondary", !down);
       lastDown = down;
     }
 
@@ -354,7 +359,11 @@ export function mountTipping(host: HTMLElement): () => void {
       }
     }
     const critDeg = (Math.atan(b / h) * 180) / Math.PI;
-    const tg = fx(`tg ${sym("θ")} = ${sym("b")}/${sym("h")}`, `= ${num(b, 2)} / ${num(h, 2)}`, `→ пада при ${num(critDeg, 1)}°`);
+    const hNote = "Тук h е височината на самата кутия (товара), не височина над пода.";
+    const chTheta = chip("θ", sym("θ"), `${num(thetaDeg)}°`);
+    const chB = chip("b", sym("b"), `${num(b, 2)} m`);
+    const chH = chip("h", sym("h"), `${num(h, 2)} m`, hNote);
+    const tg = fx(`tg ${chTheta} = ${chB}/${chH}`, `= ${num(b, 2)} / ${num(h, 2)}`, `→ пада при ${num(critDeg, 1)}°`);
     formula.set([rule, tg], cls);
 
     // Status line
@@ -376,6 +385,12 @@ export function mountTipping(host: HTMLElement): () => void {
     status.set(text, statusLevel);
   }
 
+  const unmountChips = mountChipPopovers(root, {
+    θ: ramp,
+    b: [box, supportGroup],
+    h: box,
+  });
+
   const stop = startLoop((dt) => {
     step(dt);
     render();
@@ -384,6 +399,7 @@ export function mountTipping(host: HTMLElement): () => void {
 
   return () => {
     stop();
+    unmountChips();
     offs.forEach((off) => off());
     reset.removeEventListener("click", onReset);
     root.remove();

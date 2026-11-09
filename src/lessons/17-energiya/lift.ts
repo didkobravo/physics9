@@ -16,14 +16,28 @@ import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula, fx } from "../../lib/stage";
+import { chip, mountChipPopovers } from "../../lib/chips";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, EH, G, MASS_MAX, MASS_MIN, MASS_STEP, ballRadius, joules, potential, show, type TabCtx } from "./energy-math";
+import {
+  E,
+  EH,
+  FORMULA_LINES,
+  G,
+  GROUND,
+  MASS_MAX,
+  MASS_MIN,
+  MASS_STEP,
+  VIEW_H,
+  VIEW_W,
+  ballRadius,
+  joules,
+  potential,
+  show,
+  type TabCtx,
+} from "./energy-math";
 
-const VIEW_W = 580;
-const VIEW_H = 470; // taller than Заедно: room for the F arrow above a ball at 3 m
 const SCALE = 80; // viewBox units per metre
-const GROUND = 26;
 
 const RULER_X = 70;
 const BALL_X = 200;
@@ -75,8 +89,10 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
   const hLabel = svgEl("text", { class: "scene-label", "font-size": 20 }, svg);
   hLabel.textContent = "h";
 
-  // Ball and the lifting force
-  const ball = svgEl("circle", { class: "ball" }, svg);
+  // Ball and the lifting force (wrapped in a group: the circle's own class is
+  // rewritten every frame for its colour, so a chip-glow goes on the group)
+  const ballGroup = svgEl("g", {}, svg);
+  const ball = svgEl("circle", { class: "ball" }, ballGroup);
   const ballLabel = svgEl("text", { class: "ball-label", "font-size": 11, "text-anchor": "middle" }, svg);
   const fArrow = createArrow(svg, { head: 14, halfWidth: 7 });
   const fLabel = svgEl("text", { class: "scene-label", "font-size": 18 }, svg);
@@ -89,19 +105,13 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
   const goalLabel = svgEl("text", { class: "scene-small", x: BAR_X - 12, "font-size": 15, "text-anchor": "end" }, svg);
   goalLabel.innerHTML = `${sym("m")}${sym("g")}${sym("h")}`;
 
-  const formula = createStageFormula(svg, {
-    x: 14,
-    lines: [
-      { y: 28, size: 18, cls: "work" },
-      { y: 54, size: 17, cls: "work" },
-      { y: 80, size: 17 },
-    ],
-  });
+  // Same stage position in all three tabs
+  const formula = createStageFormula(svg, { x: 14, lines: FORMULA_LINES });
 
   // ---- controls ----
   const status = createStatus();
   const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
-  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
+  const restartBtn = html<HTMLButtonElement>(`<button type="button" class="secondary">Отначало</button>`);
   const actionRow = html(`<div class="action-row"></div>`);
   actionRow.append(runBtn, restartBtn);
 
@@ -155,7 +165,8 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
     const r = ballRadius(m);
     const bottomY = toSvg({ x: 0, y: h }).y;
     const cy = bottomY - r;
-    setAttrs(ball, { cx: BALL_X, cy, r, class: h > 0 ? "ball lifted" : "ball" });
+    // This tab is about Eп from the first frame: the ball is always blue.
+    setAttrs(ball, { cx: BALL_X, cy, r, class: "ball lifted" });
     setAttrs(ballLabel, { x: BALL_X, y: cy + 4 });
     ballLabel.textContent = `${num(m, m % 1 ? 1 : 0)} kg`;
 
@@ -185,22 +196,27 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
     const gy = meter.y(goal);
     setAttrs(goalLine, { y1: gy, y2: gy });
     setAttrs(goalLabel, { y: gy + 5 });
-    barName.innerHTML = done ? E("п") : sym("A");
-    setAttrs(barName, { class: done ? "scene-label lab-p" : "scene-label" });
+    barName.innerHTML = E("п");
+    setAttrs(barName, { class: "scene-label lab-p" });
 
-    // Stage formula: neutral work while lifting, blue Eп at the top
+    // Stage formula: this tab is about Eп from the first frame, so the lead
+    // identity line and the Eп label are blue throughout, not just once done.
     const mTxt = `${num(m, 1)} kg`;
     const hTxt = `${num(hCm / 100, 2)} m`;
-    const cls = done ? "ep" : "work";
-    const fLine = fx(`${sym("F")} = ${sym("m")}${sym("g")}`, `= ${mTxt} · ${num(G, 1)} m/s²`, `= ${num(m * G, 1)} N`);
+    const fNote = "За да вдигнеш равномерно, буташ колкото тежи тялото: F = mg.";
+    const sNote = "При вдигане пътят е височината: s = h.";
+    const chEp = chip("Ep", E("п"), `${num(joules(A), 1)} J`);
+    const chF = chip("F", sym("F"), `${num(m * G, 1)} N`, fNote);
+    const chM = chip("m", sym("m"), mTxt);
+    const chG = chip("g", sym("g"), `${num(G, 1)} m/s²`);
+    const chH = chip("h", sym("h"), hTxt);
+    const lead = fx(
+      `${chEp} = ${chip("A", sym("A"), `${num(joules(A), 1)} J`)} = ${chF}·${chip("s", sym("s"), hTxt, sNote)} = ${chM}${chG}·${chH}`,
+    );
+    const fLine = fx(`${chF} = ${chM}${chG}`, `= ${mTxt} · ${num(G, 1)} m/s²`, `= ${num(m * G, 1)} N`);
     formula.set([
-      {
-        markup: done
-          ? fx(`${E("п")} = ${sym("A")} = ${sym("m")}${sym("g")}${sym("h")}`)
-          : fx(`${sym("A")} = ${sym("F")}·${sym("s")} = ${sym("m")}${sym("g")}·${sym("h")}`),
-        cls,
-      },
-      { markup: fx(done ? E("п") : sym("A"), `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`, show(A)), cls },
+      { markup: lead, cls: "ep" },
+      { markup: fx(chEp, `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`, show(A)), cls: "ep" },
       fLine,
     ]);
 
@@ -225,6 +241,16 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
     status.set(text, level, true);
   }
 
+  const unmountChips = mountChipPopovers(root, {
+    Ep: meter.g,
+    A: meter.g,
+    F: fArrow.el,
+    s: [hLine, hTop],
+    m: ballGroup,
+    g: undefined,
+    h: [hLine, hTop],
+  });
+
   const stop = startLoop((dt) => {
     step(dt);
     render();
@@ -233,6 +259,7 @@ export function mountLift(host: HTMLElement, ctx: TabCtx): () => void {
 
   return () => {
     stop();
+    unmountChips();
     offs.forEach((off) => off());
     runBtn.removeEventListener("click", onRun);
     restartBtn.removeEventListener("click", restart);

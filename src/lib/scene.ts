@@ -32,9 +32,11 @@ export function createArrow(parent: Element, opts: ArrowOpts = {}) {
   const head = opts.head ?? 16;
   const half = opts.halfWidth ?? 8;
   const extra = opts.className ? ` ${opts.className}` : "";
-  const shaft = svgEl("line", { class: `force${extra}` }, parent);
-  const tri = svgEl("polygon", { class: `force-head${extra}` }, parent);
+  const el = svgEl("g", {}, parent); // groups the arrow; a stable handle for e.g. a chip highlight
+  const shaft = svgEl("line", { class: `force${extra}` }, el);
+  const tri = svgEl("polygon", { class: `force-head${extra}` }, el);
   return {
+    el,
     set(from: Pt, to: Pt) {
       const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
       const d = { x: (to.x - from.x) / len, y: (to.y - from.y) / len };

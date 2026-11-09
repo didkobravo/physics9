@@ -18,16 +18,31 @@ import { startLoop } from "../../lib/loop";
 import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStageFormula, fx } from "../../lib/stage";
+import { chip, mountChipPopovers } from "../../lib/chips";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym } from "../../lib/svg";
-import { E, G, MASS_MAX, MASS_MIN, MASS_STEP, joules, kinetic, potential, show, ballRadius, EH, type TabCtx } from "./energy-math";
+import {
+  E,
+  EH,
+  FORMULA_LINES,
+  G,
+  GROUND,
+  MASS_MAX,
+  MASS_MIN,
+  MASS_STEP,
+  VIEW_H,
+  VIEW_W,
+  ballRadius,
+  joules,
+  kinetic,
+  potential,
+  show,
+  type TabCtx,
+} from "./energy-math";
 
 const SLOW = 4; // slow-motion factor
 
-const VIEW_W = 580;
-const VIEW_H = 420;
 const SCALE = 80; // viewBox units per metre
-const GROUND = 26; // ground strip height
 
 const RULER_X = 70;
 const BALL_X = 170;
@@ -92,8 +107,10 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
   const hLabel = svgEl("text", { class: "scene-label", "font-size": 20 }, svg);
   hLabel.textContent = "h";
 
-  // Ball and its velocity arrow
-  const ball = svgEl("circle", { class: "ball" }, svg);
+  // Ball and its velocity arrow (wrapped in a group: the circle's own class is
+  // rewritten every frame for its colour, so a chip-glow goes on the group)
+  const ballGroup = svgEl("g", {}, svg);
+  const ball = svgEl("circle", { class: "ball" }, ballGroup);
   const ballLabel = svgEl("text", { class: "ball-label", "font-size": 11, "text-anchor": "middle" }, svg);
   const vArrow = createArrow(svg, { head: 14, halfWidth: 7, className: "v-arrow" });
   const vLabel = svgEl("text", { class: "scene-label", "font-size": 20 }, svg);
@@ -114,20 +131,13 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
     lab.innerHTML = E(sub);
   }
 
-  // Fixed live formula, top-left
-  const formula = createStageFormula(svg, {
-    x: 14,
-    lines: [
-      { y: 28, size: 17, cls: "ep" },
-      { y: 54, size: 17, cls: "ek" },
-      { y: 82, size: 18 },
-    ],
-  });
+  // Fixed live formula, top-left — same position in all three tabs
+  const formula = createStageFormula(svg, { x: 14, lines: FORMULA_LINES });
 
   // ---- controls ----
   const status = createStatus();
   const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
-  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
+  const restartBtn = html<HTMLButtonElement>(`<button type="button" class="secondary">Отначало</button>`);
   const actionRow = html(`<div class="action-row"></div>`);
   actionRow.append(runBtn, restartBtn);
 
@@ -223,11 +233,19 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
     const mTxt = `${num(m, 1)} kg`;
     const hTxt = `${num(s.hCm / 100, 2)} m`;
     const vTxt = `${num(s.vCm / 100, 2)} m/s`;
+    const epVal = `${num(joules(ep), 1)} J`;
+    const ekVal = `${num(joules(ek), 1)} J`;
+    const chEp = chip("Ep", E("п"), epVal);
+    const chEk = chip("Ek", E("k"), ekVal);
     formula.set([
-      fx(`${E("п")} = ${sym("m")}${sym("g")}${sym("h")}`, `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`, show(ep)),
-      fx(`${E("k")} = ${sym("m")}${sym("v")}²/2`, `= ${mTxt} · (${vTxt})² / 2`, show(ek)),
       fx(
-        `${E("п")} + ${E("k")}`,
+        `${chEp} = ${chip("m", sym("m"), mTxt)}${chip("g", sym("g"), `${num(G, 1)} m/s²`)}${chip("h", sym("h"), hTxt)}`,
+        `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`,
+        show(ep),
+      ),
+      fx(`${chEk} = ${chip("m", sym("m"), mTxt)}${chip("v", sym("v"), vTxt)}²/2`, `= ${mTxt} · (${vTxt})² / 2`, show(ek)),
+      fx(
+        `${chEp} + ${chEk}`,
         `= ${num(joules(ep), 1)} + ${num(joules(ek), 1)}`,
         `${adds ? "=" : "≈"} ${num(joules(total), 1)} J`,
         "(не се променя)",
@@ -256,6 +274,14 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
     status.set(text, level, true);
   }
 
+  const unmountChips = mountChipPopovers(root, {
+    Ep: epMeter.g,
+    Ek: ekMeter.g,
+    m: ballGroup,
+    v: [vArrow.el, vLabel],
+    h: [hLine, hTop],
+  });
+
   const stop = startLoop((dt) => {
     step(dt);
     render();
@@ -264,6 +290,7 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
 
   return () => {
     stop();
+    unmountChips();
     offs.forEach((off) => off());
     runBtn.removeEventListener("click", onRun);
     restartBtn.removeEventListener("click", restart);
