@@ -306,3 +306,51 @@ button:disabled {
 .meter-value.pos { fill: var(--color-ok); }
 .meter-value.neg { fill: var(--color-danger); }
 .stage-formula .sub { fill: var(--text-2); }
+
+/* Lesson 17 scene */
+.ball { fill: var(--color-ball); stroke: var(--color-ball-edge); stroke-width: 2.5; }
+.ball-label { fill: var(--surface-1); font-family: var(--font-sans); font-weight: var(--font-weight-6); }
+.bar-ep { fill: var(--color-energy-p); }
+.bar-ek { fill: var(--color-energy-k); }
+.total-line { stroke: var(--text-1); stroke-width: 2; stroke-dasharray: 6 4; }
+.h-bracket { stroke: var(--text-2); stroke-width: 2; }
+.v-arrow.force { stroke: var(--color-energy-k); }
+.v-arrow.force-head { fill: var(--color-energy-k); }
+.stage-formula .ep { fill: var(--color-energy-p); }
+.stage-formula .ek { fill: var(--color-energy-k); }
+
+/* Predict-then-reveal */
+.predict {
+  display: grid;
+  gap: var(--size-2);
+  padding: var(--size-3);
+  border-radius: var(--radius-3);
+  background: var(--surface-2);
+}
+
+.predict .seg {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.predict-feedback[data-level="ok"] { color: var(--color-ok); font-weight: var(--font-weight-6); }
+.predict-feedback[data-level="warn"] { color: var(--color-warn); font-weight: var(--font-weight-6); }
+
+.predict svg {
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.predict-formula {
+  font-variant-numeric: tabular-nums;
+}
+
+.predict-formula.hit {
+  color: var(--color-ok);
+  font-weight: var(--font-weight-6);
+}
+
+.marker { stroke: var(--text-1); stroke-width: 2; }
+.marker.dashed { stroke-dasharray: 5 4; stroke: var(--text-2); }
+.marker-label { fill: var(--text-1); font-family: var(--font-sans); }
+.marker-label.dim { fill: var(--text-2); }
+.track { fill: var(--surface-1); stroke: var(--text-2); stroke-width: 2; }

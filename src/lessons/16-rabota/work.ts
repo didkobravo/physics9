@@ -17,7 +17,9 @@
 import { html, slider } from "../../lib/dom";
 import { num, numUpTo, signed } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
+import { createBarMeter } from "../../lib/meter";
 import { createArrow, createScene } from "../../lib/scene";
+import { createStageFormula } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { setAttrs, svgEl, sym as v, type Pt } from "../../lib/svg";
 
@@ -124,10 +126,13 @@ export function mountWork(host: HTMLElement): () => void {
   hugeLabel.textContent = `F = ${WALL_F} N`;
 
   // Live formula on the stage: the rule (sign) and the numbers substituted
-  const formula = svgEl("g", { class: "stage-formula" }, svg);
-  const ruleLine = svgEl("text", { class: "rule", x: FORMULA_X, y: 32, "font-size": 24 }, formula);
-  const numLine = svgEl("text", { x: FORMULA_X, y: 60, "font-size": 19 }, formula);
-  let lastFormula = "";
+  const formula = createStageFormula(svg, {
+    x: FORMULA_X,
+    lines: [
+      { y: 32, size: 24, cls: "rule" },
+      { y: 60, size: 19 },
+    ],
+  });
 
   // Work meter: zero line, ticks, bar
   const meter = svgEl("g", {}, svg);
@@ -135,10 +140,9 @@ export function mountWork(host: HTMLElement): () => void {
   const meterA = svgEl("tspan", { class: "scene-label" }, meterTitle);
   meterA.textContent = "A";
   const meterValue = svgEl("tspan", { class: "meter-value" }, meterTitle);
-  svgEl("rect", { class: "meter-frame", x: METER_X, y: METER_TOP, width: METER_W, height: METER_BOTTOM - METER_TOP, rx: 4 }, meter);
-  const meterBar = svgEl("rect", { x: METER_X + 4, width: METER_W - 8 }, meter);
+  const workMeter = createBarMeter(meter, { x: METER_X, top: METER_TOP, bottom: METER_BOTTOM, width: METER_W, min: -METER_MAX, max: METER_MAX });
   for (let j = -METER_MAX; j <= METER_MAX + 1e-9; j += 25) {
-    const y = METER_ZERO - (j / METER_MAX) * (METER_ZERO - METER_TOP);
+    const y = workMeter.y(j);
     svgEl("line", { class: "meter-tick", x1: METER_X - 5, y1: y, x2: METER_X, y2: y }, meter);
     if (j !== 0 && Math.abs(j) % 50 === 0) {
       const t = svgEl("text", { class: "meter-label", x: METER_X - 8, y: y + 5, "font-size": 16, "text-anchor": "end" }, meter);
@@ -309,20 +313,12 @@ export function mountWork(host: HTMLElement): () => void {
       show(sLabel, sLen > 24);
     }
 
-    // Stage formula (fixed position): rewrite only when the text changes
+    // Stage formula (fixed position)
     const f = stageFormula(A, sShown);
-    const key = f.rule + f.nums + f.cls;
-    if (key !== lastFormula) {
-      ruleLine.innerHTML = f.rule;
-      numLine.innerHTML = f.nums;
-      setAttrs(formula, { class: `stage-formula ${f.cls}` });
-      lastFormula = key;
-    }
+    formula.set([f.rule, f.nums], f.cls);
 
     // Meter
-    const half = METER_ZERO - METER_TOP;
-    const hgt = (Math.min(Math.abs(A), METER_MAX) / METER_MAX) * half;
-    setAttrs(meterBar, { y: A >= 0 ? METER_ZERO - hgt : METER_ZERO, height: hgt, class: A > 0 ? "meter-bar-pos" : "meter-bar-neg" });
+    workMeter.set(A, A > 0 ? "meter-bar-pos" : "meter-bar-neg");
     setAttrs(meterValue, { class: `meter-value ${A > 0 ? "pos" : A < 0 ? "neg" : ""}` });
     meterValue.textContent = ` = ${signed(A)} J`;
 

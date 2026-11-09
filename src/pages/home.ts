@@ -16,10 +16,11 @@ export const home: Mount = (el) => {
           <b>Работа и мощност</b>
           <span>Кога една сила върши работа — и кога не?</span>
         </a></li>
-        <li><span class="lesson-card" aria-disabled="true">
-          <span class="num">Урок 17 · скоро</span>
+        <li><a class="lesson-card" href="#/energiya">
+          <span class="num">Урок 17</span>
           <b>Кинетична и потенциална енергия</b>
-        </span></li>
+          <span>Къде отива енергията на падащата топка?</span>
+        </a></li>
       </ul>
     </section>`);
   el.append(page);

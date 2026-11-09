@@ -39,3 +39,19 @@
     --note-edge: var(--yellow-7);
   }
 }
+
+:root {
+  --color-energy-p: var(--blue-6);
+  --color-energy-k: var(--orange-6);
+  --color-ball: var(--pink-6);
+  --color-ball-edge: var(--pink-9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-energy-p: var(--blue-4);
+    --color-energy-k: var(--orange-4);
+    --color-ball: var(--pink-5);
+    --color-ball-edge: var(--pink-2);
+  }
+}

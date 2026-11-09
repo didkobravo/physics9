@@ -17,6 +17,7 @@ import { html, slider } from "../../lib/dom";
 import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createArrow, createScene } from "../../lib/scene";
+import { createStageFormula } from "../../lib/stage";
 import { createStatus, type Level } from "../../lib/status";
 import { pointsAttr, setAttrs, svgEl, sym, type Pt } from "../../lib/svg";
 
@@ -78,10 +79,13 @@ export function mountTipping(host: HTMLElement): () => void {
   });
   const ramp = svgEl("polygon", { class: "ramp" }, svg);
   // Live rule on the stage (fixed, top-left): how far the plumb line lands inside/outside the base
-  const formula = svgEl("g", { class: "stage-formula" }, svg);
-  const ruleLine = svgEl("text", { class: "rule", x: 16, y: 34, "font-size": 21 }, formula);
-  const tgLine = svgEl("text", { class: "sub", x: 16, y: 62, "font-size": 17 }, formula);
-  let lastFormula = "";
+  const formula = createStageFormula(svg, {
+    x: 16,
+    lines: [
+      { y: 34, size: 21, cls: "rule" },
+      { y: 62, size: 17, cls: "sub" },
+    ],
+  });
   const support = svgEl("line", { class: "support" }, svg);
   const box = svgEl("polygon", { class: "box" }, svg);
   const slat1 = svgEl("line", { class: "box-slat" }, svg);
@@ -351,13 +355,7 @@ export function mountTipping(host: HTMLElement): () => void {
     }
     const critDeg = (Math.atan(b / h) * 180) / Math.PI;
     const tg = `tg ${sym("θ")} = ${sym("b")}/${sym("h")} = ${num(b, 2)} / ${num(h, 2)} → пада при ${num(critDeg, 1)}°`;
-    const fKey = rule + tg + cls;
-    if (fKey !== lastFormula) {
-      ruleLine.textContent = rule;
-      tgLine.innerHTML = tg;
-      setAttrs(formula, { class: `stage-formula ${cls}` });
-      lastFormula = fKey;
-    }
+    formula.set([rule, tg], cls);
 
     // Status line
     let text: string;
