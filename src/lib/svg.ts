@@ -22,3 +22,6 @@ export type Pt = { x: number; y: number };
 export function pointsAttr(pts: Pt[]): string {
   return pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 }
+
+/** Italic physics symbol for use inside SVG <text> markup. */
+export const sym = (s: string): string => `<tspan class="v">${s}</tspan>`;

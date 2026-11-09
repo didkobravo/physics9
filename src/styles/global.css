@@ -228,7 +228,6 @@ button.primary:active {
 .force { stroke: var(--color-force); stroke-width: 4; }
 .force-head { fill: var(--color-force); }
 .scene-label { fill: var(--text-1); font-style: italic; font-family: var(--font-serif); }
-.scene-angle { fill: var(--text-2); font-family: var(--font-sans); }
 
 .level-ok { stroke: var(--color-ok); fill: var(--color-ok); }
 .level-warn { stroke: var(--color-warn); fill: var(--color-warn); }
@@ -306,3 +305,4 @@ button:disabled {
 .meter-value { fill: var(--text-1); font-weight: var(--font-weight-7); font-family: var(--font-sans); }
 .meter-value.pos { fill: var(--color-ok); }
 .meter-value.neg { fill: var(--color-danger); }
+.stage-formula .sub { fill: var(--text-2); }

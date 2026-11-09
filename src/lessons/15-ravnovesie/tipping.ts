@@ -18,11 +18,11 @@ import { num } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStatus, type Level } from "../../lib/status";
-import { pointsAttr, setAttrs, svgEl, type Pt } from "../../lib/svg";
+import { pointsAttr, setAttrs, svgEl, sym, type Pt } from "../../lib/svg";
 
 const G = 9.8;
 const VIEW_W = 580;
-const VIEW_H = 420;
+const VIEW_H = 460; // extra headroom keeps the stage formula clear of the ramp tip at 70°
 const SCALE = 100; // viewBox units per metre
 
 const HINGE: Pt = { x: 3.6, y: 0.25 }; // downhill end of the ramp (world)
@@ -77,7 +77,11 @@ export function mountTipping(host: HTMLElement): () => void {
     label: "Кутия върху наклонена рампа с отвес от центъра на тежестта",
   });
   const ramp = svgEl("polygon", { class: "ramp" }, svg);
-  const angleLabel = svgEl("text", { class: "scene-angle", "font-size": 20, x: 16, y: 34 }, svg);
+  // Live rule on the stage (fixed, top-left): how far the plumb line lands inside/outside the base
+  const formula = svgEl("g", { class: "stage-formula" }, svg);
+  const ruleLine = svgEl("text", { class: "rule", x: 16, y: 34, "font-size": 21 }, formula);
+  const tgLine = svgEl("text", { class: "sub", x: 16, y: 62, "font-size": 17 }, formula);
+  let lastFormula = "";
   const support = svgEl("line", { class: "support" }, svg);
   const box = svgEl("polygon", { class: "box" }, svg);
   const slat1 = svgEl("line", { class: "box-slat" }, svg);
@@ -263,7 +267,6 @@ export function mountTipping(host: HTMLElement): () => void {
     const top = add(HINGE, u, RAMP_LEN);
     const rampPts = [{ x: HINGE.x, y: 0 }, HINGE, top, { x: top.x, y: 0 }].map(toSvg);
     setAttrs(ramp, { points: pointsAttr(rampPts) });
-    angleLabel.textContent = `наклон ${num(thetaDeg)}°`;
 
     const p = pose();
     const corner = (i: number, j: number) => add(add(p.c, p.e1, (i * b) / 2), p.e2, (j * h) / 2);
@@ -324,6 +327,36 @@ export function mountTipping(host: HTMLElement): () => void {
       height.input.disabled = down;
       reset.classList.toggle("primary", down);
       lastDown = down;
+    }
+
+    // Stage formula. d = signed distance along the ramp from the plumb line's foot to the
+    // downhill edge of the base (for the upright box: d = b/2 − (h/2)·tg θ, zero at tg θ = b/h).
+    let rule: string;
+    let cls: string;
+    if (down && phase !== "tipping") {
+      rule = "кутията лежи на страната си";
+      cls = "zero";
+    } else {
+      const d = (HINGE.x - p.c.x) / Math.cos(th) - sP;
+      if (d >= 0.005) {
+        rule = `отвесът е ${num(d, 2)} m вътре в основата → стои`;
+        cls = "pos";
+      } else if (d > -0.005) {
+        rule = `отвесът е точно на ръба на основата → ${phase === "tipping" ? "пада" : "стои"}`;
+        cls = phase === "tipping" ? "neg" : "pos";
+      } else {
+        rule = `отвесът е ${num(-d, 2)} m извън основата → пада`;
+        cls = "neg";
+      }
+    }
+    const critDeg = (Math.atan(b / h) * 180) / Math.PI;
+    const tg = `tg ${sym("θ")} = ${sym("b")}/${sym("h")} = ${num(b, 2)} / ${num(h, 2)} → пада при ${num(critDeg, 1)}°`;
+    const fKey = rule + tg + cls;
+    if (fKey !== lastFormula) {
+      ruleLine.textContent = rule;
+      tgLine.innerHTML = tg;
+      setAttrs(formula, { class: `stage-formula ${cls}` });
+      lastFormula = fKey;
     }
 
     // Status line

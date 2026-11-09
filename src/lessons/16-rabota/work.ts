@@ -19,7 +19,7 @@ import { num, numUpTo, signed } from "../../lib/format";
 import { startLoop } from "../../lib/loop";
 import { createArrow, createScene } from "../../lib/scene";
 import { createStatus, type Level } from "../../lib/status";
-import { setAttrs, svgEl, type Pt } from "../../lib/svg";
+import { setAttrs, svgEl, sym as v, type Pt } from "../../lib/svg";
 
 const VIEW_W = 580;
 const VIEW_H = 300;
@@ -45,9 +45,8 @@ const METER_BOTTOM = 246;
 const METER_ZERO = (METER_TOP + METER_BOTTOM) / 2;
 const METER_MAX = F_MAX * TRACK; // 100 J fills half the meter
 
-// The live formula stays left of the meter's tick labels
-const FORMULA_LEFT = 10;
-const FORMULA_RIGHT = 440;
+// The live formula has a fixed spot in the top-left, clear of the meter
+const FORMULA_X = 14;
 
 type Dir = 1 | -1 | 0; // напред / назад / нагоре
 type Segment = { dir: Dir; F: number; cm: number }; // distance in whole centimetres
@@ -61,10 +60,6 @@ const DIRS: { dir: Dir; label: string }[] = [
 /** Work of one piece, in joules, exact for whole centimetres: A = ±F·s. */
 const segWork = (g: Segment) => (g.dir * g.F * g.cm) / 100;
 const round2 = (x: number) => Math.round(x * 100) / 100;
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
-
-/** Italic physics symbol inside SVG text. */
-const v = (sym: string) => `<tspan class="v">${sym}</tspan>`;
 
 export function mountWork(host: HTMLElement): () => void {
   // ---- state ----
@@ -130,8 +125,8 @@ export function mountWork(host: HTMLElement): () => void {
 
   // Live formula on the stage: the rule (sign) and the numbers substituted
   const formula = svgEl("g", { class: "stage-formula" }, svg);
-  const ruleLine = svgEl("text", { class: "rule", y: 32, "font-size": 24, "text-anchor": "middle" }, formula);
-  const numLine = svgEl("text", { y: 60, "font-size": 19, "text-anchor": "middle" }, formula);
+  const ruleLine = svgEl("text", { class: "rule", x: FORMULA_X, y: 32, "font-size": 24 }, formula);
+  const numLine = svgEl("text", { x: FORMULA_X, y: 60, "font-size": 19 }, formula);
   let lastFormula = "";
 
   // Work meter: zero line, ticks, bar
@@ -279,14 +274,12 @@ export function mountWork(host: HTMLElement): () => void {
     hugeArrow.show(wall);
     show(hugeLabel, wall);
 
-    let anchorX: number; // where the stage formula wants to sit
     if (wall) {
       const tip: Pt = { x: wallX - 2, y: groundY - 110 };
       hugeArrow.set({ x: tip.x - 250, y: tip.y }, tip);
       setAttrs(hugeLabel, { x: tip.x - 130, y: tip.y - 30 });
       sArrow.show(false);
       show(sLabel, false);
-      anchorX = tip.x - 130;
     } else {
       const bl = toSvg({ x: START_X + travelled, y: BLOCK_H });
       setAttrs(block, { x: bl.x, y: bl.y });
@@ -314,10 +307,9 @@ export function mountWork(host: HTMLElement): () => void {
       if (sLen > 16) sArrow.set({ x: x0, y: sy }, { x: bl.x, y: sy });
       setAttrs(sLabel, { x: x0 + sLen / 2, y: groundY - 8 });
       show(sLabel, sLen > 24);
-      anchorX = cx;
     }
 
-    // Stage formula: re-measure only when the text changes, then keep it inside the stage
+    // Stage formula (fixed position): rewrite only when the text changes
     const f = stageFormula(A, sShown);
     const key = f.rule + f.nums + f.cls;
     if (key !== lastFormula) {
@@ -326,10 +318,6 @@ export function mountWork(host: HTMLElement): () => void {
       setAttrs(formula, { class: `stage-formula ${f.cls}` });
       lastFormula = key;
     }
-    const w = Math.max(ruleLine.getComputedTextLength(), numLine.getComputedTextLength());
-    const fx = clamp(anchorX, FORMULA_LEFT + w / 2, FORMULA_RIGHT - w / 2);
-    setAttrs(ruleLine, { x: fx });
-    setAttrs(numLine, { x: fx });
 
     // Meter
     const half = METER_ZERO - METER_TOP;
