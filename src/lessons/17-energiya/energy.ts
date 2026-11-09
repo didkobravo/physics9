@@ -237,15 +237,24 @@ export function mountEnergy(host: HTMLElement, ctx: TabCtx): () => void {
     const ekVal = `${num(joules(ek), 1)} J`;
     const chEp = chip("Ep", E("п"), epVal);
     const chEk = chip("Ek", E("k"), ekVal);
+    // Per line: the Eп line is blue, the Ek line is orange. The sum line
+    // mixes both, so only its two terms are coloured (blue/orange inline);
+    // the total stays neutral rather than forcing a gradient fill.
     formula.set([
+      {
+        markup: fx(
+          `${chEp} = ${chip("m", sym("m"), mTxt)}${chip("g", sym("g"), `${num(G, 1)} m/s²`)}${chip("h", sym("h"), hTxt)}`,
+          `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`,
+          show(ep),
+        ),
+        cls: "ep",
+      },
+      {
+        markup: fx(`${chEk} = ${chip("m", sym("m"), mTxt)}${chip("v", sym("v"), vTxt)}²/2`, `= ${mTxt} · (${vTxt})² / 2`, show(ek)),
+        cls: "ek",
+      },
       fx(
-        `${chEp} = ${chip("m", sym("m"), mTxt)}${chip("g", sym("g"), `${num(G, 1)} m/s²`)}${chip("h", sym("h"), hTxt)}`,
-        `= ${mTxt} · ${num(G, 1)} m/s² · ${hTxt}`,
-        show(ep),
-      ),
-      fx(`${chEk} = ${chip("m", sym("m"), mTxt)}${chip("v", sym("v"), vTxt)}²/2`, `= ${mTxt} · (${vTxt})² / 2`, show(ek)),
-      fx(
-        `${chEp} + ${chEk}`,
+        `<tspan class="ep">${chEp}</tspan> + <tspan class="ek">${chEk}</tspan>`,
         `= ${num(joules(ep), 1)} + ${num(joules(ek), 1)}`,
         `${adds ? "=" : "≈"} ${num(joules(total), 1)} J`,
         "(не се променя)",

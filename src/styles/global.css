@@ -334,7 +334,6 @@ button:disabled {
 .wheel { fill: var(--gray-7); stroke: var(--gray-9); stroke-width: 2; }
 .push-zone { fill: var(--color-work); opacity: 0.7; }
 .target-line { stroke: var(--text-2); stroke-width: 2; stroke-dasharray: 6 4; }
-.stage-formula .work { fill: var(--text-1); }
 
 /* Formula typography (all stage formulas): the formula bold, the
    substituted numbers thin and faded, the result at full strength in the

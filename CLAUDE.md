@@ -31,6 +31,24 @@ The site is in Bulgarian. One page per lesson. Live site: GitHub Pages at `/phys
 - Stage formulas go through `fx(formula, subst, result)` in `src/lib/stage.ts`:
   the formula bold, the substituted values thin and faded, the result at full
   strength in the line's colour.
+- A whole stage formula wears the colour of the energy it's about (same
+  `ep`/`ek` classes as the colour-tokens rule above): a tab that's only ever
+  about one energy colours every line that way throughout (e.g. lesson 17's
+  Кинетична tab is orange from the first frame, Потенциална is blue, except a
+  supporting line that isn't about that energy, like `F = mg`, which stays
+  neutral). A line that mixes two energies (e.g. "Eп + Ek = …") colours only
+  the matching chip inline (`<tspan class="ep">…</tspan>`), not the whole
+  line, and leaves a mixed result (the total) neutral rather than forcing a
+  gradient fill — SVG text doesn't do gradient fills cleanly at this size.
+- Formula symbol chips (`src/lib/chips.ts` + `src/lib/glossary.ts`): every
+  symbol in a stage formula is a focusable tap target with a popover (name,
+  plain-words line, unit, live value) and a pulse on the matching scene
+  element. One glossary entry per symbol, shared by every lesson; a lesson
+  passes an occurrence-specific `note` for a rename (F = mg) or a correction
+  (lesson 15's h is the box's own height, not height above the floor). A
+  scene element that rewrites its own `class` every frame (for its colour)
+  must be wrapped in a stable group for the chip highlight to target —
+  otherwise the next render wipes the glow class.
 - Formulas and subscripts use the standard Cyrillic letterforms, not the
   Bulgarian localized ones (where п looks like n): `font-feature-settings:
   "locl" 0` for Chrome/Firefox, plus `lang="ru"` on the subscript element

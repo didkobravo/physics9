@@ -261,13 +261,17 @@ export function mountPush(host: HTMLElement, ctx: TabCtx): () => void {
     const ekVal = `${num(joules(ek), 2)} J`;
     const chA = chip("A", sym("A"), aVal);
     const chEk = chip("Ek", E("k"), ekVal);
+    // This tab is about Ek from the first frame: every line is orange.
     formula.set([
       {
         markup: fx(`${chA} = ${chip("F", sym("F"), `${F} N`)}·${chip(xKey, sym(xKey), xTxt)}`, `= ${F} N · ${xTxt}`, show(A)),
-        cls: st.pushing ? "work" : "ek",
+        cls: "ek",
       },
-      fx(`${chEk} = ${chip("m", sym("m"), `${num(m, 1)} kg`)}${chip("v", sym("v"), vTxt)}²/2`, `= ${num(m, 1)} kg · (${vTxt})² / 2`, show(ek)),
-      fx(`${chEk} = ${chA}`),
+      {
+        markup: fx(`${chEk} = ${chip("m", sym("m"), `${num(m, 1)} kg`)}${chip("v", sym("v"), vTxt)}²/2`, `= ${num(m, 1)} kg · (${vTxt})² / 2`, show(ek)),
+        cls: "ek",
+      },
+      { markup: fx(`${chEk} = ${chA}`), cls: "ek" },
     ]);
 
     if (done && !reported) {
