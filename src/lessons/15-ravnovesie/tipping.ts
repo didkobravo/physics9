@@ -117,11 +117,15 @@ export function mountTipping(host: HTMLElement): () => void {
     value: h,
     format: (v) => `${num(v, 2)} m`,
   });
-  const reset = html<HTMLButtonElement>(`<button type="button" class="primary">Изправи кутията</button>`);
+  // Becomes the filled primary action only while the box is down
+  const reset = html<HTMLButtonElement>(`<button type="button">↻ Изправи кутията</button>`);
+  const actionRow = html(`<div class="action-row"></div>`);
+  actionRow.append(reset);
 
+  // The tilt slider is the main action, so it sits right under the stage
   const controls = html(`<div class="controls"></div>`);
-  controls.append(angle.root, width.root, height.root, reset);
-  root.append(svg, status.el, controls);
+  controls.append(width.root, height.root);
+  root.append(svg, angle.root, status.el, actionRow, controls);
   host.append(root);
 
   const standUp = () => {
@@ -318,6 +322,7 @@ export function mountTipping(host: HTMLElement): () => void {
     if (down !== lastDown) {
       width.input.disabled = down;
       height.input.disabled = down;
+      reset.classList.toggle("primary", down);
       lastDown = down;
     }
 

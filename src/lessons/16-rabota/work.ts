@@ -12,7 +12,7 @@
  *
  * Work is added up piece by piece (A += ±F·Δs), so changing the direction or
  * size of F mid-run shows the pieces summing. Distances are quantised to
- * 1 cm so the formula on the page multiplies exactly the numbers it shows.
+ * 1 cm so the formula on the stage multiplies exactly the numbers it shows.
  */
 import { html, slider } from "../../lib/dom";
 import { num, numUpTo, signed } from "../../lib/format";
@@ -45,6 +45,10 @@ const METER_BOTTOM = 246;
 const METER_ZERO = (METER_TOP + METER_BOTTOM) / 2;
 const METER_MAX = F_MAX * TRACK; // 100 J fills half the meter
 
+// The live formula stays left of the meter's tick labels
+const FORMULA_LEFT = 10;
+const FORMULA_RIGHT = 440;
+
 type Dir = 1 | -1 | 0; // напред / назад / нагоре
 type Segment = { dir: Dir; F: number; cm: number }; // distance in whole centimetres
 
@@ -56,7 +60,11 @@ const DIRS: { dir: Dir; label: string }[] = [
 
 /** Work of one piece, in joules, exact for whole centimetres: A = ±F·s. */
 const segWork = (g: Segment) => (g.dir * g.F * g.cm) / 100;
-const round2 = (v: number) => Math.round(v * 100) / 100;
+const round2 = (x: number) => Math.round(x * 100) / 100;
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+
+/** Italic physics symbol inside SVG text. */
+const v = (sym: string) => `<tspan class="v">${sym}</tspan>`;
 
 export function mountWork(host: HTMLElement): () => void {
   // ---- state ----
@@ -89,7 +97,9 @@ export function mountWork(host: HTMLElement): () => void {
       t.textContent = m === TRACK ? `${num(m, 1)} m` : `${num(m)}`;
     }
   }
-  const sBar = svgEl("line", { class: "s-bar" }, svg);
+
+  // Displacement arrow s, from the start mark to the block
+  const sArrow = createArrow(svg, { head: 14, halfWidth: 7, className: "s-arrow" });
   const sLabel = svgEl("text", { class: "scene-label", "font-size": 20, "text-anchor": "middle" }, svg);
   sLabel.textContent = "s";
 
@@ -118,9 +128,14 @@ export function mountWork(host: HTMLElement): () => void {
   const hugeLabel = svgEl("text", { class: "scene-label", "font-size": 24, "text-anchor": "middle" }, svg);
   hugeLabel.textContent = `F = ${WALL_F} N`;
 
+  // Live formula on the stage: the rule (sign) and the numbers substituted
+  const formula = svgEl("g", { class: "stage-formula" }, svg);
+  const ruleLine = svgEl("text", { class: "rule", y: 32, "font-size": 24, "text-anchor": "middle" }, formula);
+  const numLine = svgEl("text", { y: 60, "font-size": 19, "text-anchor": "middle" }, formula);
+  let lastFormula = "";
+
   // Work meter: zero line, ticks, bar
   const meter = svgEl("g", {}, svg);
-  // Title doubles as the readout: "A = +32,2 J", kept above the scale so it never hits the tick labels
   const meterTitle = svgEl("text", { x: METER_X + METER_W / 2, y: METER_TOP - 12, "font-size": 19, "text-anchor": "middle" }, meter);
   const meterA = svgEl("tspan", { class: "scene-label" }, meterTitle);
   meterA.textContent = "A";
@@ -139,11 +154,13 @@ export function mountWork(host: HTMLElement): () => void {
   const zeroLabel = svgEl("text", { class: "meter-zero-label", x: METER_X - 16, y: METER_ZERO + 6, "font-size": 16, "text-anchor": "end" }, meter);
   zeroLabel.textContent = "0";
 
-  // ---- readouts & controls ----
+  // ---- controls: primary action right under the stage ----
   const status = createStatus();
-  const readout = html(`<div class="readout"><p data-s></p><p data-formula></p></div>`);
-  const sOut = readout.querySelector<HTMLElement>("[data-s]")!;
-  const formulaOut = readout.querySelector<HTMLElement>("[data-formula]")!;
+
+  const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
+  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
+  const actionRow = html(`<div class="action-row"></div>`);
+  actionRow.append(runBtn, restartBtn);
 
   const dirGroup = html(`<div class="seg" role="group" aria-label="Посока на силата F"></div>`);
   const dirButtons = DIRS.map(({ dir: d, label }) => {
@@ -153,18 +170,16 @@ export function mountWork(host: HTMLElement): () => void {
     return b;
   });
 
-  const force = slider({ label: "Сила F", min: F_MIN, max: F_MAX, step: 5, value: F, format: (v) => `${num(v)} N` });
+  const force = slider({ label: "Сила F", min: F_MIN, max: F_MAX, step: 5, value: F, format: (x) => `${num(x)} N` });
 
-  const runBtn = html<HTMLButtonElement>(`<button type="button" class="primary"></button>`);
-  const restartBtn = html<HTMLButtonElement>(`<button type="button">Отначало</button>`);
   const wallBtn = html<HTMLButtonElement>(`<button type="button"></button>`);
   const btnRow = html(`<div class="btn-row"></div>`);
-  btnRow.append(runBtn, restartBtn, wallBtn);
+  btnRow.append(wallBtn);
 
   const controls = html(`<div class="controls"></div>`);
   controls.append(dirGroup, force.root, btnRow);
   const root = html(`<div class="sim"></div>`);
-  root.append(svg, status.el, readout, controls);
+  root.append(svg, actionRow, status.el, controls);
   host.append(root);
 
   // ---- actions ----
@@ -185,13 +200,12 @@ export function mountWork(host: HTMLElement): () => void {
   };
 
   const onDir = (e: Event) => {
-    const d = Number((e.currentTarget as HTMLElement).dataset.dir) as Dir;
-    dir = d;
+    dir = Number((e.currentTarget as HTMLElement).dataset.dir) as Dir;
     changeForce();
   };
   dirButtons.forEach((b) => b.addEventListener("click", onDir));
-  const offForce = force.onInput((v) => {
-    F = v;
+  const offForce = force.onInput((x) => {
+    F = x;
     changeForce();
   });
   const onRun = () => {
@@ -216,6 +230,38 @@ export function mountWork(host: HTMLElement): () => void {
     if (travelled >= TRACK) running = false;
   }
 
+  /** Rule line + numbers line for the stage formula, and its colour class. */
+  function stageFormula(A: number, s: number): { rule: string; nums: string; cls: string } {
+    if (wall) {
+      return { rule: `${v("s")} = 0 → ${v("A")} = 0`, nums: `${v("A")} = ${WALL_F} N · 0 m = 0 J`, cls: "zero" };
+    }
+    const rule =
+      dir === 1 ? `${v("A")} = +${v("F")}·${v("s")}` : dir === -1 ? `${v("A")} = −${v("F")}·${v("s")}` : `${v("F")} ⊥ ${v("s")} → ${v("A")} = 0`;
+    const cls = dir === 1 ? "pos" : dir === -1 ? "neg" : "zero";
+
+    const last = segments[segments.length - 1];
+    const pieces = segments.filter((g) => g.cm > 0);
+    const single = pieces.length === 0 || (pieces.length === 1 && pieces[0] === last);
+    let nums: string;
+    if (single) {
+      const sTxt = `${num(s, 2)} m`;
+      if (dir === 1) nums = `${v("A")} = +${F} N · ${sTxt} = ${signed(A)} J`;
+      else if (dir === -1) nums = `${v("A")} = −${F} N · ${sTxt} = ${signed(A)} J`;
+      else nums = `${F} N ⊥ ${sTxt} → ${v("A")} = 0 J`;
+    } else {
+      // Several pieces: show how they add up
+      const terms = pieces.map((g, i) => {
+        const w = round2(segWork(g));
+        const t = numUpTo(Math.abs(w));
+        if (i === 0) return w < 0 ? `−${t}` : t;
+        return `${w < 0 ? "−" : "+"} ${t}`;
+      });
+      const shown = terms.length > 4 ? ["…", ...terms.slice(-3)] : terms;
+      nums = `${v("A")} = ${shown.join(" ")} = ${signed(A)} J`;
+    }
+    return { rule, nums, cls };
+  }
+
   // ---- render ----
   const show = (el: SVGElement, on: boolean) => (el.style.display = on ? "" : "none");
 
@@ -223,23 +269,24 @@ export function mountWork(host: HTMLElement): () => void {
     const A = wall ? 0 : work();
     const sShown = wall ? 0 : totalCm() / 100;
 
-    // Scene elements per mode
     show(block, !wall);
     show(massLabel, !wall);
     show(rope, !wall);
     show(motor, !wall);
-    show(sBar, !wall);
-    show(sLabel, !wall);
     show(wallEl, wall);
     fArrow.show(!wall);
     show(fLabel, !wall);
     hugeArrow.show(wall);
     show(hugeLabel, wall);
 
+    let anchorX: number; // where the stage formula wants to sit
     if (wall) {
       const tip: Pt = { x: wallX - 2, y: groundY - 110 };
       hugeArrow.set({ x: tip.x - 250, y: tip.y }, tip);
       setAttrs(hugeLabel, { x: tip.x - 130, y: tip.y - 30 });
+      sArrow.show(false);
+      show(sLabel, false);
+      anchorX = tip.x - 130;
     } else {
       const bl = toSvg({ x: START_X + travelled, y: BLOCK_H });
       setAttrs(block, { x: bl.x, y: bl.y });
@@ -248,36 +295,48 @@ export function mountWork(host: HTMLElement): () => void {
       setAttrs(massLabel, { x: cx, y: cy + 12 });
       setAttrs(rope, { x1: bl.x + BLOCK_W * SCALE, y1: groundY - 15, x2: motorX + 14, y2: groundY - 15 });
 
-      // F arrow from the block's centre; length grows with F (5 N → 40, 50 N → 100 units)
+      // F arrow; length grows with F (5 N → 40, 50 N → 100 units).
+      // Horizontal arrows run near the block's top edge so they clear the low motor.
       const len = 40 + ((F - F_MIN) / (F_MAX - F_MIN)) * 60;
-      // Horizontal arrows run near the block's top edge so they clear the low motor
       const ay = bl.y + 14;
-      const from: Pt = { x: cx, y: dir === 0 ? bl.y : ay };
-      const to: Pt = dir === 0 ? { x: cx, y: bl.y - len } : { x: cx + dir * (len + BLOCK_W * SCALE * 0.5), y: ay };
-      if (dir !== 0) from.x = cx + dir * BLOCK_W * SCALE * 0.5; // start at the face it points away from
+      const from: Pt = dir === 0 ? { x: cx, y: bl.y } : { x: cx + dir * BLOCK_W * SCALE * 0.5, y: ay };
+      const to: Pt = dir === 0 ? { x: cx, y: bl.y - len } : { x: from.x + dir * len, y: ay };
       fArrow.set(from, to);
       if (dir === 0) setAttrs(fLabel, { x: cx + 10, y: to.y + 18 });
       else setAttrs(fLabel, { x: (from.x + to.x) / 2 - 6, y: to.y - 12 });
       fLabel.textContent = "F";
 
-      // s bracket under the ruler from 0 to the block's left edge
+      // s arrow along the floor, pointing the way the block moves
       const x0 = toSvg({ x: START_X, y: 0 }).x;
-      setAttrs(sBar, { x1: x0, y1: groundY + 4, x2: bl.x, y2: groundY + 4 });
-      setAttrs(sLabel, { x: (x0 + bl.x) / 2, y: groundY - 6 });
-      show(sLabel, bl.x - x0 > 24);
+      const sy = groundY + 6;
+      const sLen = bl.x - x0;
+      sArrow.show(sLen > 16);
+      if (sLen > 16) sArrow.set({ x: x0, y: sy }, { x: bl.x, y: sy });
+      setAttrs(sLabel, { x: x0 + sLen / 2, y: groundY - 8 });
+      show(sLabel, sLen > 24);
+      anchorX = cx;
     }
+
+    // Stage formula: re-measure only when the text changes, then keep it inside the stage
+    const f = stageFormula(A, sShown);
+    const key = f.rule + f.nums + f.cls;
+    if (key !== lastFormula) {
+      ruleLine.innerHTML = f.rule;
+      numLine.innerHTML = f.nums;
+      setAttrs(formula, { class: `stage-formula ${f.cls}` });
+      lastFormula = key;
+    }
+    const w = Math.max(ruleLine.getComputedTextLength(), numLine.getComputedTextLength());
+    const fx = clamp(anchorX, FORMULA_LEFT + w / 2, FORMULA_RIGHT - w / 2);
+    setAttrs(ruleLine, { x: fx });
+    setAttrs(numLine, { x: fx });
 
     // Meter
     const half = METER_ZERO - METER_TOP;
     const hgt = (Math.min(Math.abs(A), METER_MAX) / METER_MAX) * half;
-    const y = A >= 0 ? METER_ZERO - hgt : METER_ZERO;
-    setAttrs(meterBar, { y, height: hgt, class: A > 0 ? "meter-bar-pos" : "meter-bar-neg" });
+    setAttrs(meterBar, { y: A >= 0 ? METER_ZERO - hgt : METER_ZERO, height: hgt, class: A > 0 ? "meter-bar-pos" : "meter-bar-neg" });
     setAttrs(meterValue, { class: `meter-value ${A > 0 ? "pos" : A < 0 ? "neg" : ""}` });
     meterValue.textContent = ` = ${signed(A)} J`;
-
-    // Readouts
-    sOut.innerHTML = `Път: <i>s</i> = ${num(sShown, 2)} m`;
-    formulaOut.innerHTML = formula(A, sShown);
 
     // Controls
     dirButtons.forEach((b) => {
@@ -287,56 +346,35 @@ export function mountWork(host: HTMLElement): () => void {
     force.input.disabled = wall;
     runBtn.disabled = wall;
     const atEnd = travelled >= TRACK - 1e-9;
-    runBtn.textContent = running ? "Пауза" : atEnd ? "Пусни отново" : "Пусни";
+    runBtn.textContent = running ? "❚❚ Пауза" : atEnd ? "↻ Пусни отново" : "▶ Пусни";
     wallBtn.textContent = wall ? "Обратно към блока" : "Бутни стената";
 
     // Status
     let text: string;
     let level: Level;
     if (wall) {
-      text = `Бутаме с ${WALL_F} N, но стената не помръдва: s = 0, значи A = 0.`;
+      text = `${WALL_F} N, но стената не мърда: s = 0 → A = 0.`;
       level = "neutral";
     } else if (atEnd) {
-      text = "Блокът стигна края. Натисни „Пусни отново“.";
+      text = "Край на пътя.";
       level = "neutral";
     } else if (!running && travelled === 0) {
-      text = "Избери посока на силата и натисни „Пусни“.";
+      text = "Избери посока на F и натисни „Пусни“.";
       level = "neutral";
     } else {
       const pre = running ? "" : "Пауза. ";
       if (dir === 1) {
-        text = `${pre}Силата сочи по посоката на движението → A расте.`;
+        text = `${pre}F и s сочат в една посока → A расте.`;
         level = "ok";
       } else if (dir === -1) {
-        text = `${pre}Силата сочи срещу движението → A намалява.`;
+        text = `${pre}F и s сочат в различни посоки → A намалява.`;
         level = "danger";
       } else {
-        text = `${pre}Силата е перпендикулярна на движението → A не се променя.`;
+        text = `${pre}F ⊥ s → A не се променя. Блокът (${WEIGHT} N) не се вдига.`;
         level = "neutral";
       }
     }
     status.set(text, level);
-  }
-
-  /** The formula line: one piece → A = ±F·s with numbers; several → the sum of the pieces. */
-  function formula(A: number, s: number): string {
-    if (wall) return `<i>A</i> = <i>F</i>·<i>s</i> = ${WALL_F} N · 0 m = 0 J`;
-    const pieces = segments.filter((g) => g.cm > 0);
-    if (pieces.length <= 1) {
-      const g = pieces[0] ?? segments[segments.length - 1];
-      const sTxt = `${num(s, 2)} m`;
-      if (g.dir === 1) return `<i>A</i> = <i>F</i>·<i>s</i> = ${g.F} N · ${sTxt} = ${numUpTo(A)} J`;
-      if (g.dir === -1) return `<i>A</i> = −<i>F</i>·<i>s</i> = −(${g.F} N · ${sTxt}) = ${signed(A)} J`;
-      return `<i>A</i> = 0 — силата е перпендикулярна на пътя`;
-    }
-    const terms = pieces.map((g, i) => {
-      const w = round2(segWork(g));
-      const t = w === 0 ? "0 J" : `${numUpTo(Math.abs(w))} J`;
-      if (i === 0) return w < 0 ? `−${t}` : t;
-      return `${w < 0 ? "−" : "+"} ${t}`;
-    });
-    const shown = terms.length > 4 ? ["…", ...terms.slice(-3)] : terms;
-    return `<i>A</i> = ${shown.join(" ")} = ${signed(A)} J`;
   }
 
   const stop = startLoop((dt) => {
@@ -355,4 +393,3 @@ export function mountWork(host: HTMLElement): () => void {
     root.remove();
   };
 }
-
